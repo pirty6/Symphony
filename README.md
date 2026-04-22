@@ -20,12 +20,12 @@ that connects them.
 
 ## The Four Roles (Three Layers)
 
-| Layer | Role | What it does | Edit files? | Spawn agents? |
-|-------|------|-------------|:-:|:-:|
-| Infrastructure | **Stage** | Pure pipe — runs bash, routes output. Zero decisions. | ✗ | ✗ |
-| Infrastructure | **Score** | `score.sh` — deterministic state machine. Never writes files, never spawns agents. | ✗ | ✗ |
-| Direction | **Composer** | Owns the full resolution loop. Reads Score instructions. Spawns Assessors for evidence. Decides. Spawns Executors. Re-invokes Score. | ✗ | ✓ |
-| Performance | **Instrument** | Does the actual work. Two sub-types: **Assessor** (read-only + viability judgment) and **Executor** (sole write path). | Executor only | ✗ |
+| Layer          | Role           | What it does                                                                                                                         |  Edit files?  | Spawn agents? |
+| -------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------ | :-----------: | :-----------: |
+| Infrastructure | **Stage**      | Pure pipe — runs bash, routes output. Zero decisions.                                                                                |       ✗       |       ✗       |
+| Infrastructure | **Score**      | `score.sh` — deterministic state machine. Never writes files, never spawns agents.                                                   |       ✗       |       ✗       |
+| Direction      | **Composer**   | Owns the full resolution loop. Reads Score instructions. Spawns Assessors for evidence. Decides. Spawns Executors. Re-invokes Score. |       ✗       |       ✓       |
+| Performance    | **Instrument** | Does the actual work. Two sub-types: **Assessor** (read-only + viability judgment) and **Executor** (sole write path).               | Executor only |       ✗       |
 
 ### Why this split matters
 
@@ -100,10 +100,10 @@ result=$(npx tsx "${SCRIPT_DIR}/lib/analyze.ts" --input "$data" 2>&1) || {
 
 Lib scripts follow the same exit code contract as `score.sh`:
 
-| Exit | Meaning |
-|------|---------|
-| `0`  | Success — stdout has the result |
-| `1`  | Fatal failure — stderr has the error |
+| Exit | Meaning                                        |
+| ---- | ---------------------------------------------- |
+| `0`  | Success — stdout has the result                |
+| `1`  | Fatal failure — stderr has the error           |
 | `2`  | Judgment needed — stdout has structured output |
 
 Lib scripts must be **deterministic and testable** — no AI calls, no side effects
@@ -161,6 +161,7 @@ PROMPT
 ```
 
 **Invariants:**
+
 - Every judgment type has **both** `_composer()` and `_instrument()` — no orphans
 - Every `_instrument()` declares `ALLOWED TOOLS:` — explicit allowlist
 - Both functions return non-empty output
@@ -195,13 +196,13 @@ INSTRUMENT_INSTRUCTIONS_BEGIN … INSTRUMENT_INSTRUCTIONS_END
 
 ## Permission Model
 
-| Role | Edit files? | Spawn agents? | Read/web? | Viability judgment? |
-|------|:-:|:-:|:-:|:-:|
-| Stage | ✗ | ✗ | ✗ | ✗ |
-| Score | ✗ | ✗ | ✗ | ✗ |
-| Composer | ✗ | ✓ | ✓ | ✗ (delegates) |
-| Instrument-Assessor | ✗ | ✗ | ✓ | ✓ |
-| Instrument-Executor | ✓ | ✗ | ✓ | ✗ |
+| Role                | Edit files? | Spawn agents? | Read/web? | Viability judgment? |
+| ------------------- | :---------: | :-----------: | :-------: | :-----------------: |
+| Stage               |      ✗      |       ✗       |     ✗     |          ✗          |
+| Score               |      ✗      |       ✗       |     ✗     |          ✗          |
+| Composer            |      ✗      |       ✓       |     ✓     |    ✗ (delegates)    |
+| Instrument-Assessor |      ✗      |       ✗       |     ✓     |          ✓          |
+| Instrument-Executor |      ✓      |       ✗       |     ✓     |          ✗          |
 
 ---
 
@@ -292,13 +293,13 @@ Outer Symphony
 
 ## Key Design Decisions
 
-| Decision | Reason |
-|----------|--------|
-| Bash for the state machine | Deterministic, auditable, testable — no AI hallucination in control flow |
-| Paired prompts | Composer decides *what to do*; Assessor decides *what the evidence shows* — never mixed |
-| `ALLOWED TOOLS:` in instrument prompts | Explicit tool allowlists are the security boundary per judgment type |
-| One-shot vars with `unset` | Prevents judgment results from leaking to subsequent phases or re-invocations |
-| Max invocation guard | Prevents infinite loops — force `exit 1` after N re-invocations |
-| `exit 2` pause protocol | Clean boundary between deterministic and AI layers — no in-band signaling |
-| `lib/` for complex scripts | TypeScript/Node scripts follow the same exit code contract; tested alongside score.sh |
-| Watch mode testing | Instant feedback loop — structural + behavioral tests on every save |
+| Decision                               | Reason                                                                                  |
+| -------------------------------------- | --------------------------------------------------------------------------------------- |
+| Bash for the state machine             | Deterministic, auditable, testable — no AI hallucination in control flow                |
+| Paired prompts                         | Composer decides _what to do_; Assessor decides _what the evidence shows_ — never mixed |
+| `ALLOWED TOOLS:` in instrument prompts | Explicit tool allowlists are the security boundary per judgment type                    |
+| One-shot vars with `unset`             | Prevents judgment results from leaking to subsequent phases or re-invocations           |
+| Max invocation guard                   | Prevents infinite loops — force `exit 1` after N re-invocations                         |
+| `exit 2` pause protocol                | Clean boundary between deterministic and AI layers — no in-band signaling               |
+| `lib/` for complex scripts             | TypeScript/Node scripts follow the same exit code contract; tested alongside score.sh   |
+| Watch mode testing                     | Instant feedback loop — structural + behavioral tests on every save                     |

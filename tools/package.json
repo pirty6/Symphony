@@ -1,0 +1,41 @@
+{
+  "name": "@fluidx-tools/claude-tools",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Test runner and CLI for Claude skill state machines (score.sh)",
+  "repository": {
+    "type": "git",
+    "url": "https://office.visualstudio.com/DefaultCollection/OC/_git/office-bohemia"
+  },
+  "bin": "./lib/cli.js",
+  "type": "commonjs",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "source": "./src/index.ts",
+      "default": "./lib/index.js"
+    },
+    "./cli": {
+      "types": "./lib/types/cli.d.ts",
+      "source": "./src/cli.ts",
+      "default": "./lib/cli.js"
+    }
+  },
+  "scripts": {
+    "lint": "just-scripts lint",
+    "test": "just-scripts test"
+  },
+  "dependencies": {
+    "@swc/helpers": "^0.5.12",
+    "tslib": "^2.1.0",
+    "yargs": "^16.1.1"
+  },
+  "devDependencies": {
+    "@fluidx/eslint-plugin-ffx-rules": "*",
+    "@fluidx/office-bohemia-build-tools": "*",
+    "@types/jest": "^29.5.11",
+    "jest": "^30.0.2"
+  }
+}

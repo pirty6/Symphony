@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "module": "node16",
+    "moduleResolution": "node16",
+    "outDir": "./lib",
+    "declarationDir": "./lib/types",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "rootDir": "src",
+    "verbatimModuleSyntax": false,
+    "types": ["jest", "node"]
+  },
+  "include": ["src"],
+  "exclude": ["just.config.cjs", "lib"]
+}

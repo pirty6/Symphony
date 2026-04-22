@@ -1,0 +1,28 @@
+{
+  "name": "symphony",
+  "version": "1.0.0",
+  "description": "A pattern for building deterministic, auditable AI agent workflows using state machines, structured prompt hand-offs, and strict role separation.",
+  "keywords": [],
+  "homepage": "https://github.com/pirty6/Symphony#readme",
+  "bugs": {
+    "url": "https://github.com/pirty6/Symphony/issues"
+  },
+  "license": "ISC",
+  "author": "",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pirty6/Symphony.git"
+  },
+  "type": "commonjs",
+  "scripts": {
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check"
+  },
+  "devDependencies": {
+    "oxfmt": "^0.46.0",
+    "oxlint": "^1.61.0",
+    "typescript": "^6.0.3"
+  }
+}
