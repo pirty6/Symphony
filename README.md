@@ -48,7 +48,7 @@ skills/my-skill/
   prompts.sh         # Paired prompt templates
   test-score.sh      # Tests (structural + behavioral)
   lib/               # Complex scripts called by score.sh
-    analyze.py       #   Python, Node, etc.
+    analyze.ts       #   TypeScript, Node, etc.
     transform.sh     #   Heavier bash logic
 ```
 
@@ -86,11 +86,11 @@ exit 0
 ### `lib/` — Complex Scripts
 
 When a phase needs logic that's awkward in bash (parsing, data transforms, API calls),
-put it in `lib/` as a standalone script. `score.sh` calls these as subprocesses:
+put it in `lib/` as a standalone script. `score.sh` calls these via `npx tsx`:
 
 ```bash
-# score.sh calls a Python script
-result=$("${SCRIPT_DIR}/lib/analyze.py" --input "$data" 2>&1) || {
+# score.sh calls a TypeScript script
+result=$(npx tsx "${SCRIPT_DIR}/lib/analyze.ts" --input "$data" 2>&1) || {
   judgment "analysis-failed" \
     "$(prompt_analysis_failed_composer)" \
     "$(prompt_analysis_failed_instrument)" \
@@ -110,27 +110,33 @@ Lib scripts must be **deterministic and testable** — no AI calls, no side effe
 beyond their explicit output. They're part of the Score layer, not the Intelligence
 layer.
 
-```python
-#!/usr/bin/env python3
-"""lib/analyze.py — Example lib script."""
-import sys, json
+```typescript
+// lib/analyze.ts — Example lib script.
 
-def analyze(data: dict) -> dict:
-    # Deterministic work...
-    return {"result": "ok"}
+interface AnalysisResult {
+  result: string;
+}
 
-if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--input", required=True)
-    args = parser.parse_args()
-    try:
-        result = analyze(json.loads(args.input))
-        print(json.dumps(result))
-        sys.exit(0)
-    except Exception as e:
-        print(str(e), file=sys.stderr)
-        sys.exit(1)
+function analyze(data: Record<string, unknown>): AnalysisResult {
+  // Deterministic work...
+  return { result: "ok" };
+}
+
+const args = process.argv.slice(2);
+const inputIdx = args.indexOf("--input");
+if (inputIdx === -1 || inputIdx + 1 >= args.length) {
+  console.error("--input is required");
+  process.exit(1);
+}
+
+try {
+  const result = analyze(JSON.parse(args[inputIdx + 1]));
+  console.log(JSON.stringify(result));
+  process.exit(0);
+} catch (e) {
+  console.error(String(e));
+  process.exit(1);
+}
 ```
 
 ### `prompts.sh` — The Prompt Templates
@@ -229,8 +235,8 @@ output=$(env REPO_ROOT=/tmp bash score.sh 2>&1) || exit_code=$?
 assert_eq "exits 0 on happy path" "0" "${exit_code:-0}"
 
 # Test lib scripts
-output=$(lib/analyze.py --input '{"test": true}' 2>&1) || exit_code=$?
-assert_eq "analyze.py exits 0" "0" "${exit_code:-0}"
+output=$(npx tsx lib/analyze.ts --input '{"test": true}' 2>&1) || exit_code=$?
+assert_eq "analyze.ts exits 0" "0" "${exit_code:-0}"
 assert_contains "returns JSON" '"result"' "$output"
 ```
 
@@ -243,7 +249,7 @@ bash run-tests-watch.sh skills/my-skill
 ```
 
 Uses `fswatch` if available (instant reload), falls back to 2s polling.
-Watches `*.sh`, `*.py`, `*.md` in the skill directory.
+Watches `*.sh`, `*.ts`, `*.md` in the skill directory.
 
 ---
 
@@ -268,7 +274,7 @@ Outer Symphony
 2. Identify judgment calls (where AI intelligence is needed)
 3. Write `score.sh` — phases + `judgment()` calls at pause points
 4. Write `prompts.sh` — paired `_composer()` + `_instrument()` for each judgment type
-5. Add `lib/` scripts — for any logic too complex for bash (Python, Node, etc.)
+5. Add `lib/` scripts — for any logic too complex for bash (TypeScript, Node, etc.)
 6. Write `SKILL.md` — Stage instructions
 7. Write `test-score.sh` — structural tests + behavioral tests for score.sh and lib/
 8. Set up watch mode — `bash run-tests-watch.sh skills/my-skill`
@@ -294,5 +300,5 @@ Outer Symphony
 | One-shot vars with `unset` | Prevents judgment results from leaking to subsequent phases or re-invocations |
 | Max invocation guard | Prevents infinite loops — force `exit 1` after N re-invocations |
 | `exit 2` pause protocol | Clean boundary between deterministic and AI layers — no in-band signaling |
-| `lib/` for complex scripts | Python/Node scripts follow the same exit code contract; tested alongside score.sh |
+| `lib/` for complex scripts | TypeScript/Node scripts follow the same exit code contract; tested alongside score.sh |
 | Watch mode testing | Instant feedback loop — structural + behavioral tests on every save |
