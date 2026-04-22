@@ -55,12 +55,5 @@ Report the Composer's final result to the user including the `QUALITY` rating of
 - **NEVER** skip a strategy because its `QUALITY=HACKY` yourself — that judgment belongs to the Composer
 - If the Composer returns an error or unexpected result, report it to the user and stop
 
-## Guardrails
-
-- `score.sh` enforces `MAX_INVOCATIONS=16` and rejects re-invocations where both `APPLY_COMPLETE` and `SKIP_STRATEGY` are set.
-- One-shot judgment vars (`APPLY_COMPLETE`, `SKIP_STRATEGY`, `QUALITY`, `PATTERN_USED`) are consumed and unset by `score.sh` automatically.
-- `KNOWLEDGE_CONTEXT` is passed through every cycle unchanged — the Score never modifies it.
-
 **On any `*_WARNING` or `*_ERROR` line in output:**
 Stop immediately. Show the user the exact line. Ask: *"score.sh reported a failure — do you want to continue?"* Do not proceed until they confirm.
-
