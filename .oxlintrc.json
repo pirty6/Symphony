@@ -1,12 +1,76 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript"],
+  "plugins": ["typescript", "import", "unicorn"],
   "env": {
     "node": true
   },
   "rules": {
     "no-unused-vars": "warn",
-    "no-console": "off"
+    "no-console": "off",
+    "no-async-promise-executor": "error",
+    "no-duplicate-case": "error",
+    "no-labels": "error",
+    "no-var": "error",
+    "no-plusplus": "error",
+    "eqeqeq": ["error", "always", { "null": "ignore" }],
+    "radix": "error",
+    "curly": ["error", "all"],
+    "no-debugger": "error",
+    "no-new-wrappers": "error",
+    "prefer-const": [
+      "error",
+      {
+        "destructuring": "all",
+        "ignoreReadBeforeAssign": true
+      }
+    ],
+    "prefer-promise-reject-errors": "error",
+    "no-param-reassign": "error",
+    "object-shorthand": ["error", "always"],
+    "no-implicit-coercion": ["error", { "allow": ["!!"] }],
+
+    "@typescript-eslint/no-unused-expressions": [
+      "error",
+      {
+        "allowShortCircuit": true,
+        "allowTernary": true,
+        "enforceForJSX": true
+      }
+    ],
+    "@typescript-eslint/consistent-type-assertions": [
+      "error",
+      { "assertionStyle": "as", "objectLiteralTypeAssertions": "never" }
+    ],
+    "@typescript-eslint/consistent-type-imports": ["error", { "disallowTypeAnnotations": false }],
+    "@typescript-eslint/no-import-type-side-effects": "error",
+    "@typescript-eslint/no-explicit-any": "error",
+    "@typescript-eslint/no-namespace": "error",
+    "@typescript-eslint/no-misused-promises": ["error", { "checksVoidReturn": false }],
+    "@typescript-eslint/no-this-alias": "error",
+    "@typescript-eslint/no-unnecessary-condition": ["error", { "allowConstantLoopConditions": true }],
+    "@typescript-eslint/no-unnecessary-type-assertion": "error",
+    "@typescript-eslint/no-non-null-assertion": "error",
+    "@typescript-eslint/await-thenable": "error",
+    "@typescript-eslint/no-unsafe-function-type": "error",
+    "@typescript-eslint/ban-tslint-comment": "error",
+    "@typescript-eslint/only-throw-error": "error",
+    "@typescript-eslint/prefer-optional-chain": "error",
+    "@typescript-eslint/switch-exhaustiveness-check": ["error", { "considerDefaultExhaustiveForUnions": true }],
+    "@typescript-eslint/ban-ts-comment": [
+      "error",
+      {
+        "ts-expect-error": true,
+        "ts-ignore": true,
+        "ts-nocheck": true,
+        "ts-check": false
+      }
+    ],
+    "@typescript-eslint/no-implied-eval": "error",
+
+    "import/no-duplicates": "error",
+
+    "unicorn/no-instanceof-array": "error",
+    "unicorn/no-invalid-remove-event-listener": "error"
   },
   "ignorePatterns": ["node_modules", "dist"]
 }
