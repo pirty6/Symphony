@@ -68,7 +68,60 @@ DEGREES_OF_FREEDOM=<comma-separated>
 QUALITY_CRITERIA=<comma-separated>`;
 }
 
-// ── Phase 3: Strategy Discovery ────────────────────────────────────
+// ── Phase 3: Problem Classification ────────────────────────────────
+
+export function promptProblemClassificationComposer(): string {
+  return `You have the goal, success condition, and constraint map. Now classify the problem before brainstorming strategies.
+
+Spawn an Assessor with the INSTRUMENT_INSTRUCTIONS and REVIEW_CONTEXT blocks.
+
+Based on the Assessor's findings, use the RE_INVOCATION_TEMPLATE. Copy the ACCUMULATED_FLAGS as-is and append:
+  --problem-class "<change_type>:<scope>:<known_shape_or_novel>"
+
+If the Assessor identifies a KNOWN_SHAPE, the strategy discovery phase will use the known strategy ladder directly instead of brainstorming from scratch.`;
+}
+
+export function promptProblemClassificationInstrument(): string {
+  return `Instrument-Assessor. ALLOWED TOOLS: semantic_search, grep_search, file_search, read_file, list_dir.
+
+Given the GOAL, SUCCESS_CONDITION, INVARIANTS, DEGREES_OF_FREEDOM, QUALITY_CRITERIA, and DOMAIN:
+
+Classify the problem on three axes:
+
+**Axis 1 — Change Type:**
+- BEHAVIORAL: logic fix, feature addition, bug fix (changes what the code does)
+- STRUCTURAL: refactor, migration, architecture change (changes how the code is organized)
+- HYGIENE: config, dependency update, flag, lint fix (changes supporting infrastructure)
+
+**Axis 2 — Scope:**
+- LOCALIZED: affects one file or one module, no cross-cutting concerns
+- SYSTEMIC: affects multiple modules, shared contracts, or cross-cutting concerns
+
+**Axis 3 — Known Shape (most important — enables short-circuit):**
+Does this problem match a well-known pattern? If yes, the strategy ladder is already known.
+
+Known shapes (check each):
+- SCHEMA_MIGRATION: database schema change with data migration
+- RACE_CONDITION: concurrency bug with shared mutable state
+- CACHING: performance problem solvable by memoization or cache layer
+- AUTH_FLOW: authentication or authorization change
+- FEATURE_FLAG: feature rollout behind a flag
+- API_VERSIONING: breaking API change requiring versioning
+- DEPENDENCY_UPGRADE: library version bump with breaking changes
+- STATE_MACHINE: adding/modifying states and transitions
+- NOVEL: does not match any known shape — requires full brainstorming
+
+Search the codebase to confirm the classification. Look at the files that would be affected.
+
+Return structured findings:
+CHANGE_TYPE=BEHAVIORAL|STRUCTURAL|HYGIENE
+SCOPE=LOCALIZED|SYSTEMIC
+KNOWN_SHAPE=<shape name or NOVEL>
+KNOWN_SHAPE_RATIONALE=<why this shape, or why NOVEL>
+PROBLEM_CLASS=<change_type>:<scope>:<known_shape>`;
+}
+
+// ── Phase 4: Strategy Discovery ────────────────────────────────────
 
 export function promptStrategyDiscoveryComposer(): string {
   return `You have the goal, success condition, and constraint map. Now discover all possible strategies.
@@ -84,9 +137,20 @@ Each strategy should be a short name. Use | as delimiter.`;
 export function promptStrategyDiscoveryInstrument(): string {
   return `Instrument-Assessor. ALLOWED TOOLS: semantic_search, grep_search, file_search, read_file, list_dir, fetch_webpage.
 
-Given the GOAL, SUCCESS_CONDITION, INVARIANTS, DEGREES_OF_FREEDOM, QUALITY_CRITERIA, and DOMAIN:
+Given the GOAL, SUCCESS_CONDITION, INVARIANTS, DEGREES_OF_FREEDOM, QUALITY_CRITERIA, PROBLEM_CLASS, and DOMAIN:
 
-Generate ALL plausible strategies to achieve the goal. For each strategy:
+**If PROBLEM_CLASS contains a known shape (not NOVEL):**
+Use the known strategy ladder for that shape as a starting point. You may add or remove strategies, but the known ladder provides the default ordering. Do NOT brainstorm from scratch.
+
+**If PROBLEM_CLASS is NOVEL or not set:**
+Generate ALL plausible strategies to achieve the goal.
+
+**PROBLEM_CLASS constraints:**
+- If SCOPE=LOCALIZED, do NOT propose strategies that touch multiple modules
+- If CHANGE_TYPE=HYGIENE, do NOT propose architectural strategies
+- If CHANGE_TYPE=BEHAVIORAL, prefer strategies that change behavior without restructuring
+
+For each strategy:
 - Name it concisely (e.g., "feature-flag-gate", "extend-state-model", "replace-state-layer")
 - Describe what changes it requires (1-2 sentences)
 - Note which invariants it respects and which degrees of freedom it uses
@@ -101,7 +165,7 @@ STRATEGY_2=<name>: <description>
 STRATEGIES_RAW=<name1|name2|name3|...>`;
 }
 
-// ── Phase 4: Strategy Ordering ─────────────────────────────────────
+// ── Phase 5: Strategy Ordering ─────────────────────────────────────
 
 export function promptStrategyOrderingComposer(): string {
   return `You have raw candidate strategies. Now order them into a safety ladder.
@@ -136,41 +200,51 @@ ORDERING_RATIONALE=<why this order>
 STRATEGIES_ORDERED=<strategy1|strategy2|strategy3|...>`;
 }
 
-// ── Phase 5: Verify Hook Definition ────────────────────────────────
+// ── Phase 6: Verify Hook Definition ────────────────────────────────
 
 export function promptVerifyHookComposer(): string {
-  return `You have ordered strategies. Now define how to verify each one worked.
+  return `You have ordered strategies. Now define two tiers of verification hooks.
 
 Spawn an Assessor with the INSTRUMENT_INSTRUCTIONS and REVIEW_CONTEXT blocks.
 
 Based on the Assessor's findings, use the RE_INVOCATION_TEMPLATE. Copy the ACCUMULATED_FLAGS as-is and append:
-  --verify-hook-confirmed '[{"strategy":"<name>","verify":"<command>"}, ...]'`;
+  --verify-hook-confirmed true --problem-hooks '[{"verify":"<command>"}, ...]' --strategy-hooks '[{"strategy":"<name>","verify":"<command>"}, ...]'
+
+IMPORTANT: Problem hooks are derived from the SUCCESS_CONDITION — they verify the problem is solved regardless of which strategy was used. Strategy hooks are specific to each strategy and are discarded on escalation.`;
 }
 
 export function promptVerifyHookInstrument(): string {
   return `Instrument-Assessor. ALLOWED TOOLS: semantic_search, grep_search, file_search, read_file, list_dir.
 
-Given STRATEGIES_ORDERED, SUCCESS_CONDITION, and DOMAIN:
+Given STRATEGIES_ORDERED, SUCCESS_CONDITION, GOAL, and DOMAIN:
 
-For each strategy in the ordered list, define a concrete verification hook — a command or check that proves the strategy succeeded. Examples:
-- "run: npm test -- --filter=auth"
-- "check: file exists at src/collab/provider.ts with export CollabProvider"
-- "run: curl -s localhost:3000/api/health | jq .status == 'ok'"
-- "check: no TypeScript errors in src/"
+Define TWO TIERS of verification hooks:
 
-The verify hook must be:
-1. Automatable (runnable as a command or checkable as a file condition)
-2. Deterministic (same result every time if the strategy worked)
-3. Specific to the strategy (not a generic "tests pass")
+**Tier 1 — Problem-level hooks** (derived from SUCCESS_CONDITION and GOAL only):
+These verify the problem is solved regardless of which strategy was used. They survive strategy escalation.
+- Can be written purely from the success condition
+- Must NOT reference strategy-specific details (flag names, specific files, migration steps)
+- Examples: "run: npm test", "check: endpoint returns 200", "check: no TypeScript errors"
+
+**Tier 2 — Strategy-level hooks** (specific to each strategy):
+These verify a particular strategy's implementation. They are DISCARDED when escalating to the next strategy.
+- Reference strategy-specific artifacts (a flag name, a file path, a config key)
+- Examples: "check: feature flag 'collab' exists in config", "check: migration file 001_add_collab.sql exists"
+
+Classification rule: if a hook can be written purely from SUCCESS_CONDITION + GOAL, it's problem-level. If it references anything from a strategy's implementation, it's strategy-level.
 
 Return structured findings:
-VERIFY_HOOKS=[
+PROBLEM_HOOKS=[
+  {"verify": "<command or check>"},
+  ...
+]
+STRATEGY_HOOKS=[
   {"strategy": "<name>", "verify": "<command or check>"},
   ...
 ]`;
 }
 
-// ── Phase 6: Score Emission ────────────────────────────────────────
+// ── Phase 7: Score Emission ────────────────────────────────────────
 
 export function promptScoreEmissionComposer(): string {
   return `You have a complete, validated spec (or the spec has been approved by the human).
@@ -202,7 +276,7 @@ Return:
 READY_TO_EMIT=YES`;
 }
 
-// ── Phase 7: Score Execution ───────────────────────────────────────
+// ── Phase 8: Score Execution ───────────────────────────────────────
 
 export function promptScoreExecutionComposer(): string {
   return `The strategy has been implemented. Now verify it works.

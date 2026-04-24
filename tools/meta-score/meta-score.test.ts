@@ -98,10 +98,10 @@ describe("Behavioral: meta-score state machine", () => {
       qualityCriteria: "no new dependencies",
     });
     expect(result.exitCode).toBe(2);
-    expect(result.output).toContain("JUDGMENT_REQUEST: strategy-discovery");
+    expect(result.output).toContain("JUDGMENT_REQUEST: problem-classification");
   });
 
-  test("advances past phase 3 when strategies are discovered", () => {
+  test("advances past phase 3 when problem is classified", () => {
     const result = runMetaScore({
       goal: "add real-time collaboration",
       goalConfirmed: "confirmed",
@@ -110,18 +110,36 @@ describe("Behavioral: meta-score state machine", () => {
       invariants: "public API",
       degreesOfFreedom: "internal",
       qualityCriteria: "clean",
+      problemClass: "BEHAVIORAL:SYSTEMIC:NOVEL",
+    });
+    expect(result.exitCode).toBe(2);
+    expect(result.output).toContain("JUDGMENT_REQUEST: strategy-discovery");
+    expect(result.output).toContain("PROBLEM_CLASS=BEHAVIORAL:SYSTEMIC:NOVEL");
+  });
+
+  test("advances past phase 4 when strategies are discovered", () => {
+    const result = runMetaScore({
+      goal: "add real-time collaboration",
+      goalConfirmed: "confirmed",
+      successCondition: "two users can edit simultaneously",
+      constraintsConfirmed: "true",
+      invariants: "public API",
+      degreesOfFreedom: "internal",
+      qualityCriteria: "clean",
+      problemClass: "BEHAVIORAL:SYSTEMIC:NOVEL",
       strategiesRaw: "feature-flag|extend-state|replace-state",
     });
     expect(result.exitCode).toBe(2);
     expect(result.output).toContain("JUDGMENT_REQUEST: strategy-ordering");
   });
 
-  test("advances past phase 4 when strategies are ordered", () => {
+  test("advances past phase 5 when strategies are ordered", () => {
     const result = runMetaScore({
       goal: "add real-time collaboration",
       goalConfirmed: "confirmed",
       successCondition: "two users can edit simultaneously",
       constraintsConfirmed: "true",
+      problemClass: "BEHAVIORAL:SYSTEMIC:NOVEL",
       strategiesRaw: "feature-flag|extend-state|replace-state",
       strategiesOrdered: "feature-flag|extend-state|replace-state",
     });
@@ -135,9 +153,12 @@ describe("Behavioral: meta-score state machine", () => {
       goalConfirmed: "confirmed",
       successCondition: "two users can edit simultaneously",
       constraintsConfirmed: "true",
+      problemClass: "BEHAVIORAL:SYSTEMIC:NOVEL",
       strategiesRaw: "feature-flag|extend-state",
       strategiesOrdered: "feature-flag|extend-state",
-      verifyHookConfirmed: '[{"strategy":"feature-flag","verify":"test passes"}]',
+      verifyHookConfirmed: "true",
+      problemHooks: '[{"verify":"npm test"}]',
+      strategyHooks: '[{"strategy":"feature-flag","verify":"test passes"}]',
     });
     expect(result.exitCode).toBe(2);
     expect(result.output).toContain("JUDGMENT_REQUEST: spec-review");
@@ -151,9 +172,12 @@ describe("Behavioral: meta-score state machine", () => {
       goalConfirmed: "confirmed",
       successCondition: "two users can edit simultaneously",
       constraintsConfirmed: "true",
+      problemClass: "BEHAVIORAL:SYSTEMIC:NOVEL",
       strategiesRaw: "feature-flag|extend-state",
       strategiesOrdered: "feature-flag|extend-state",
-      verifyHookConfirmed: '[{"strategy":"feature-flag","verify":"test passes"}]',
+      verifyHookConfirmed: "true",
+      problemHooks: '[{"verify":"npm test"}]',
+      strategyHooks: '[{"strategy":"feature-flag","verify":"test passes"}]',
       specApproved: "true",
     });
     expect(result.exitCode).toBe(2);
@@ -167,9 +191,12 @@ describe("Behavioral: meta-score state machine", () => {
       goalConfirmed: "confirmed",
       successCondition: "two users can edit simultaneously",
       constraintsConfirmed: "true",
+      problemClass: "BEHAVIORAL:SYSTEMIC:NOVEL",
       strategiesRaw: "feature-flag|extend-state",
       strategiesOrdered: "feature-flag|extend-state",
-      verifyHookConfirmed: '[{"strategy":"feature-flag","verify":"test passes"}]',
+      verifyHookConfirmed: "true",
+      problemHooks: '[{"verify":"npm test"}]',
+      strategyHooks: '[{"strategy":"feature-flag","verify":"test passes"}]',
       specApproved: "true",
       scoreGenerated: "true",
     });
@@ -183,9 +210,12 @@ describe("Behavioral: meta-score state machine", () => {
       goalConfirmed: "confirmed",
       successCondition: "two users can edit simultaneously",
       constraintsConfirmed: "true",
+      problemClass: "BEHAVIORAL:SYSTEMIC:NOVEL",
       strategiesRaw: "feature-flag|extend-state",
       strategiesOrdered: "feature-flag|extend-state",
-      verifyHookConfirmed: '[{"strategy":"feature-flag","verify":"test passes"}]',
+      verifyHookConfirmed: "true",
+      problemHooks: '[{"verify":"npm test"}]',
+      strategyHooks: '[{"strategy":"feature-flag","verify":"test passes"}]',
       specApproved: "true",
       scoreGenerated: "true",
       executionApproved: "true",

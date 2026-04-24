@@ -23,9 +23,12 @@ export interface MetaScoreInput {
   invariants?: string;
   degreesOfFreedom?: string;
   qualityCriteria?: string;
+  problemClass?: string;
   strategiesRaw?: string;
   strategiesOrdered?: string;
   verifyHookConfirmed?: string;
+  problemHooks?: string;
+  strategyHooks?: string;
   specApproved?: string;
   scoreGenerated?: string;
   executionApproved?: string;
@@ -52,6 +55,8 @@ import {
   promptGoalClarificationInstrument,
   promptConstraintMappingComposer,
   promptConstraintMappingInstrument,
+  promptProblemClassificationComposer,
+  promptProblemClassificationInstrument,
   promptStrategyDiscoveryComposer,
   promptStrategyDiscoveryInstrument,
   promptStrategyOrderingComposer,
@@ -77,9 +82,12 @@ function buildAccumulatedFlags(input: MetaScoreInput): string {
   if (input.invariants) flags.push(`--invariants "${input.invariants}"`);
   if (input.degreesOfFreedom) flags.push(`--degrees-of-freedom "${input.degreesOfFreedom}"`);
   if (input.qualityCriteria) flags.push(`--quality-criteria "${input.qualityCriteria}"`);
+  if (input.problemClass) flags.push(`--problem-class "${input.problemClass}"`);
   if (input.strategiesRaw) flags.push(`--strategies-raw "${input.strategiesRaw}"`);
   if (input.strategiesOrdered) flags.push(`--strategies-ordered "${input.strategiesOrdered}"`);
   if (input.verifyHookConfirmed) flags.push(`--verify-hook-confirmed '${input.verifyHookConfirmed}'`);
+  if (input.problemHooks) flags.push(`--problem-hooks '${input.problemHooks}'`);
+  if (input.strategyHooks) flags.push(`--strategy-hooks '${input.strategyHooks}'`);
   if (input.specApproved) flags.push(`--spec-approved "${input.specApproved}"`);
   if (input.scoreGenerated) flags.push(`--score-generated "${input.scoreGenerated}"`);
   if (input.executionApproved) flags.push(`--execution-approved "${input.executionApproved}"`);
@@ -176,6 +184,29 @@ function phaseConstraintMapping(input: MetaScoreInput): ScoreResult | null {
   );
 }
 
+function phaseProblemClassification(input: MetaScoreInput): ScoreResult | null {
+  if (input.problemClass) {
+    return null;
+  }
+
+  return judgment(
+    "problem-classification",
+    promptProblemClassificationComposer(),
+    promptProblemClassificationInstrument(),
+    {
+      GOAL: input.goal,
+      SUCCESS_CONDITION: input.successCondition ?? "",
+      INVARIANTS: input.invariants ?? "",
+      DEGREES_OF_FREEDOM: input.degreesOfFreedom ?? "",
+      QUALITY_CRITERIA: input.qualityCriteria ?? "",
+      DOMAIN: input.domain ?? "",
+      KNOWLEDGE_CONTEXT: input.knowledgeContext ?? "",
+    },
+    input,
+    '--problem-class "<change_type>:<scope>:<known_shape_or_novel>"',
+  );
+}
+
 function phaseStrategyDiscovery(input: MetaScoreInput): ScoreResult | null {
   if (input.strategiesRaw) {
     return null;
@@ -191,6 +222,7 @@ function phaseStrategyDiscovery(input: MetaScoreInput): ScoreResult | null {
       INVARIANTS: input.invariants ?? "",
       DEGREES_OF_FREEDOM: input.degreesOfFreedom ?? "",
       QUALITY_CRITERIA: input.qualityCriteria ?? "",
+      PROBLEM_CLASS: input.problemClass ?? "",
       DOMAIN: input.domain ?? "",
       KNOWLEDGE_CONTEXT: input.knowledgeContext ?? "",
     },
@@ -232,11 +264,12 @@ function phaseVerifyHook(input: MetaScoreInput): ScoreResult | null {
     {
       STRATEGIES_ORDERED: input.strategiesOrdered ?? "",
       SUCCESS_CONDITION: input.successCondition ?? "",
+      GOAL: input.goal,
       DOMAIN: input.domain ?? "",
       KNOWLEDGE_CONTEXT: input.knowledgeContext ?? "",
     },
     input,
-    `--verify-hook-confirmed '[{"strategy":"<name>","verify":"<command>"}]'`,
+    `--verify-hook-confirmed true --problem-hooks '[{"verify":"<command>"}]' --strategy-hooks '[{"strategy":"<name>","verify":"<command>"}]'`,
   );
 }
 
@@ -256,7 +289,8 @@ function phaseScoreEmission(input: MetaScoreInput): ScoreResult | null {
       `DEGREES_OF_FREEDOM: ${input.degreesOfFreedom ?? "none specified"}`,
       `QUALITY_CRITERIA: ${input.qualityCriteria ?? "none specified"}`,
       `STRATEGIES_ORDERED: ${input.strategiesOrdered}`,
-      `VERIFY_HOOKS: ${input.verifyHookConfirmed}`,
+      `PROBLEM_HOOKS: ${input.problemHooks ?? "none"}`,
+      `STRATEGY_HOOKS: ${input.strategyHooks ?? "none"}`,
       "SPEC_END",
       "",
       "HUMAN_REVIEW_REQUIRED: Review the spec above. Re-invoke with SPEC_APPROVED=true to generate score.sh + prompts.sh.",
@@ -285,7 +319,8 @@ function phaseScoreEmission(input: MetaScoreInput): ScoreResult | null {
       GOAL: input.goal,
       SUCCESS_CONDITION: input.successCondition ?? "",
       STRATEGIES_ORDERED: input.strategiesOrdered ?? "",
-      VERIFY_HOOKS: input.verifyHookConfirmed ?? "",
+      PROBLEM_HOOKS: input.problemHooks ?? "",
+      STRATEGY_HOOKS: input.strategyHooks ?? "",
       INVARIANTS: input.invariants ?? "",
       DOMAIN: input.domain ?? "",
       KNOWLEDGE_CONTEXT: input.knowledgeContext ?? "",
@@ -309,7 +344,8 @@ function phaseScoreExecution(input: MetaScoreInput): ScoreResult | null {
         GOAL: input.goal,
         SUCCESS_CONDITION: input.successCondition ?? "",
         STRATEGIES_ORDERED: input.strategiesOrdered ?? "",
-        VERIFY_HOOKS: input.verifyHookConfirmed ?? "",
+        PROBLEM_HOOKS: input.problemHooks ?? "",
+        STRATEGY_HOOKS: input.strategyHooks ?? "",
         DOMAIN: input.domain ?? "",
         KNOWLEDGE_CONTEXT: input.knowledgeContext ?? "",
       },
@@ -351,6 +387,7 @@ export function runMetaScore(input: MetaScoreInput): ScoreResult {
   const phases: Array<(input: MetaScoreInput) => ScoreResult | null> = [
     phaseGoalDefinition,
     phaseConstraintMapping,
+    phaseProblemClassification,
     phaseStrategyDiscovery,
     phaseStrategyOrdering,
     phaseVerifyHook,
