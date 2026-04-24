@@ -1,3 +1,7 @@
-let { createConfig } = require("@fluidx/office-bohemia-build-tools/lib/jest/jest-config");
-
-module.exports = createConfig("test");
+/** @type {import('jest').Config} */
+module.exports = {
+  preset: "ts-jest",
+  testEnvironment: "node",
+  roots: ["."],
+  testMatch: ["**/*.test.ts"],
+};

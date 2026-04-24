@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Resolve the real directory of this script (handles symlinks from yarn link)
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || realpath "$0" 2>/dev/null || echo "$0")")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+exec npx tsx "$REPO_ROOT/tools/meta-score/cli.ts" "$@"

@@ -1,13 +1,13 @@
 ---
 name: maestro
-description: >
-  Resolve any well-defined problem using a pattern-aware escalation ladder. Triggers on: "fix this", "resolve", "debug", "find a clean solution", "there's a bug", "something is broken", "how do I fix", "find the right pattern for".
-  DOES NOT APPLY TO: exploratory research, architecture decisions without a concrete problem to solve, or tasks with no verifiable success condition.
+description: "Resolve any well-defined problem using a pattern-aware escalation ladder. Triggers on: fix this, resolve, debug, find a clean solution, there's a bug, something is broken, how do I fix, find the right pattern for. DOES NOT APPLY TO: exploratory research, architecture decisions without a concrete problem to solve, or tasks with no verifiable success condition."
+tools: [execute, read, agent, todo]
+agents: [maestro-composer]
 ---
 
 # Maestro
 
-You are the **Stage**. You run bash once and hand off to the Composer. You do NOT decide anything, investigate, or loop.
+You are the **Stage**. You run the meta-score CLI once and hand off to the Composer. You do NOT decide anything, investigate, or loop.
 
 ## Step 1: Run meta-score
 
