@@ -9,60 +9,49 @@
 // ── Phase 1: Goal Clarification ────────────────────────────────────
 
 export function promptGoalClarificationComposer(): string {
-  return `You received a goal that needs clarification before it can be turned into a strategy ladder.
+  return `Spawn Assessor with INSTRUMENT_INSTRUCTIONS and REVIEW_CONTEXT.
 
-Spawn an Assessor with the INSTRUMENT_INSTRUCTIONS and REVIEW_CONTEXT blocks.
-
-Based on the Assessor's findings:
-- If the goal IS concrete: use the RE_INVOCATION_TEMPLATE from the output. Copy the ACCUMULATED_FLAGS block as-is and append the NEW_FLAGS filled with the Assessor's values:
-  --goal-confirmed "<assessor's confirmed goal>" --success-condition "<assessor's success condition>"
-- If the goal is NOT concrete: ask the user for clarification. Do NOT guess.`;
+If goal IS concrete: use RE_INVOCATION_TEMPLATE, copy ACCUMULATED_FLAGS as-is, append:
+  --goal-confirmed "<confirmed goal>" --success-condition "<success condition>"
+If NOT concrete: ask the user for clarification. Do NOT guess.`;
 }
 
 export function promptGoalClarificationInstrument(): string {
   return `Instrument-Assessor. ALLOWED TOOLS: semantic_search, grep_search, file_search, read_file, list_dir.
 
-Analyze the GOAL in the review context. Determine:
+Analyze the GOAL. Determine:
+1. CONCRETE: Is it specific enough to verify completion? (YES/NO)
+   - Concrete = testable end state. Vague = no verifiable condition.
+2. If NOT concrete: list CLARIFICATION_QUESTIONS to make it concrete.
+3. If concrete: propose SUCCESS_CONDITION — verifiable end state.
 
-1. CONCRETE: Is this goal specific enough to verify completion? (YES/NO)
-   - A concrete goal has a testable end state (e.g., "tests pass", "endpoint returns 200", "file exists with schema X").
-   - A vague goal lacks a verifiable condition (e.g., "improve performance", "make it better", "add collaboration").
-
-2. If NOT concrete, list CLARIFICATION_QUESTIONS — the minimum set of questions whose answers would make the goal concrete.
-
-3. If concrete, propose SUCCESS_CONDITION — a single sentence describing the verifiable end state.
-
-Return structured findings:
+Return:
 CONCRETE=YES|NO
-SUCCESS_CONDITION=<proposed condition if concrete>
-CLARIFICATION_QUESTIONS=<list if not concrete>`;
+SUCCESS_CONDITION=<if concrete>
+CLARIFICATION_QUESTIONS=<if not concrete>`;
 }
 
 // ── Phase 2: Constraint Mapping ────────────────────────────────────
 
 export function promptConstraintMappingComposer(): string {
-  return `You have a confirmed goal and success condition. Now map the boundaries.
+  return `Goal and success condition confirmed. Map the boundaries.
 
-Spawn an Assessor with the INSTRUMENT_INSTRUCTIONS and REVIEW_CONTEXT blocks.
+Spawn Assessor with INSTRUMENT_INSTRUCTIONS and REVIEW_CONTEXT.
 
-Based on the Assessor's findings, use the RE_INVOCATION_TEMPLATE. Copy the ACCUMULATED_FLAGS as-is and append:
-  --constraints-confirmed true --invariants "<assessor's invariants>" --degrees-of-freedom "<assessor's degrees>" --quality-criteria "<assessor's criteria>"`;
+Use RE_INVOCATION_TEMPLATE, copy ACCUMULATED_FLAGS as-is, append:
+  --constraints-confirmed true --invariants "<invariants>" --degrees-of-freedom "<degrees>" --quality-criteria "<criteria>"`;
 }
 
 export function promptConstraintMappingInstrument(): string {
   return `Instrument-Assessor. ALLOWED TOOLS: semantic_search, grep_search, file_search, read_file, list_dir.
 
-Given the GOAL, SUCCESS_CONDITION, DOMAIN, and any user-provided CONSTRAINTS, analyze the codebase and identify:
+Given GOAL, SUCCESS_CONDITION, DOMAIN, and CONSTRAINTS, search the codebase and identify:
 
-1. INVARIANTS — things that must NOT change. Examples: public API signatures, database schemas, existing test contracts, auth flows.
-   Search the codebase for the relevant boundaries.
+1. INVARIANTS — must NOT change (e.g., public APIs, schemas, test contracts, auth flows).
+2. DEGREES_OF_FREEDOM — CAN change (e.g., internal implementation, new files, config).
+3. QUALITY_CRITERIA — what good looks like. Derive from KNOWLEDGE_CONTEXT if provided, else infer from codebase.
 
-2. DEGREES_OF_FREEDOM — things that CAN change. Examples: internal implementation, new files, configuration, feature flags.
-
-3. QUALITY_CRITERIA — what a good solution looks like. Examples: no new dependencies, backwards compatible, follows existing patterns, has tests.
-   Derive these from KNOWLEDGE_CONTEXT if provided, otherwise infer from codebase conventions.
-
-Return structured findings:
+Return:
 INVARIANTS=<comma-separated>
 DEGREES_OF_FREEDOM=<comma-separated>
 QUALITY_CRITERIA=<comma-separated>`;
@@ -71,96 +60,66 @@ QUALITY_CRITERIA=<comma-separated>`;
 // ── Phase 3: Problem Classification ────────────────────────────────
 
 export function promptProblemClassificationComposer(): string {
-  return `You have the goal, success condition, and constraint map. Now classify the problem before brainstorming strategies.
+  return `Goal, success condition, and constraints mapped. Classify the problem.
 
-Spawn an Assessor with the INSTRUMENT_INSTRUCTIONS and REVIEW_CONTEXT blocks.
+Spawn Assessor with INSTRUMENT_INSTRUCTIONS and REVIEW_CONTEXT.
 
-Based on the Assessor's findings, use the RE_INVOCATION_TEMPLATE. Copy the ACCUMULATED_FLAGS as-is and append:
+Use RE_INVOCATION_TEMPLATE, copy ACCUMULATED_FLAGS as-is, append:
   --problem-class "<change_type>:<scope>:<known_shape_or_novel>"
 
-If the Assessor identifies a KNOWN_SHAPE, the strategy discovery phase will use the known strategy ladder directly instead of brainstorming from scratch.`;
+Known shapes enable short-circuit: strategy discovery uses the known ladder directly.`;
 }
 
 export function promptProblemClassificationInstrument(): string {
   return `Instrument-Assessor. ALLOWED TOOLS: semantic_search, grep_search, file_search, read_file, list_dir.
 
-Given the GOAL, SUCCESS_CONDITION, INVARIANTS, DEGREES_OF_FREEDOM, QUALITY_CRITERIA, and DOMAIN:
+Classify on three axes:
 
-Classify the problem on three axes:
+**Axis 1 — Change Type:** BEHAVIORAL | STRUCTURAL | HYGIENE
+**Axis 2 — Scope:** LOCALIZED | SYSTEMIC
+**Axis 3 — Known Shape:**
+Known: SCHEMA_MIGRATION, RACE_CONDITION, CACHING, AUTH_FLOW, FEATURE_FLAG, API_VERSIONING, DEPENDENCY_UPGRADE, STATE_MACHINE
+Otherwise: NOVEL (requires full brainstorming)
 
-**Axis 1 — Change Type:**
-- BEHAVIORAL: logic fix, feature addition, bug fix (changes what the code does)
-- STRUCTURAL: refactor, migration, architecture change (changes how the code is organized)
-- HYGIENE: config, dependency update, flag, lint fix (changes supporting infrastructure)
+Search codebase to confirm. Look at affected files.
 
-**Axis 2 — Scope:**
-- LOCALIZED: affects one file or one module, no cross-cutting concerns
-- SYSTEMIC: affects multiple modules, shared contracts, or cross-cutting concerns
-
-**Axis 3 — Known Shape (most important — enables short-circuit):**
-Does this problem match a well-known pattern? If yes, the strategy ladder is already known.
-
-Known shapes (check each):
-- SCHEMA_MIGRATION: database schema change with data migration
-- RACE_CONDITION: concurrency bug with shared mutable state
-- CACHING: performance problem solvable by memoization or cache layer
-- AUTH_FLOW: authentication or authorization change
-- FEATURE_FLAG: feature rollout behind a flag
-- API_VERSIONING: breaking API change requiring versioning
-- DEPENDENCY_UPGRADE: library version bump with breaking changes
-- STATE_MACHINE: adding/modifying states and transitions
-- NOVEL: does not match any known shape — requires full brainstorming
-
-Search the codebase to confirm the classification. Look at the files that would be affected.
-
-Return structured findings:
+Return:
 CHANGE_TYPE=BEHAVIORAL|STRUCTURAL|HYGIENE
 SCOPE=LOCALIZED|SYSTEMIC
-KNOWN_SHAPE=<shape name or NOVEL>
-KNOWN_SHAPE_RATIONALE=<why this shape, or why NOVEL>
+KNOWN_SHAPE=<shape or NOVEL>
+KNOWN_SHAPE_RATIONALE=<why>
 PROBLEM_CLASS=<change_type>:<scope>:<known_shape>`;
 }
 
 // ── Phase 4: Strategy Discovery ────────────────────────────────────
 
 export function promptStrategyDiscoveryComposer(): string {
-  return `You have the goal, success condition, and constraint map. Now discover all possible strategies.
+  return `Discover all possible strategies.
 
-Spawn an Assessor with the INSTRUMENT_INSTRUCTIONS and REVIEW_CONTEXT blocks.
+Spawn Assessor with INSTRUMENT_INSTRUCTIONS and REVIEW_CONTEXT.
 
-Based on the Assessor's findings, use the RE_INVOCATION_TEMPLATE. Copy the ACCUMULATED_FLAGS as-is and append:
+Use RE_INVOCATION_TEMPLATE, copy ACCUMULATED_FLAGS as-is, append:
   --strategies-raw "<strategy1|strategy2|strategy3|...>"
 
-Each strategy should be a short name. Use | as delimiter.`;
+Each strategy = short name, | delimited.`;
 }
 
 export function promptStrategyDiscoveryInstrument(): string {
   return `Instrument-Assessor. ALLOWED TOOLS: semantic_search, grep_search, file_search, read_file, list_dir, fetch_webpage.
 
-Given the GOAL, SUCCESS_CONDITION, INVARIANTS, DEGREES_OF_FREEDOM, QUALITY_CRITERIA, PROBLEM_CLASS, and DOMAIN:
+If PROBLEM_CLASS has a known shape: use its known strategy ladder as starting point.
+If NOVEL: brainstorm all plausible strategies.
 
-**If PROBLEM_CLASS contains a known shape (not NOVEL):**
-Use the known strategy ladder for that shape as a starting point. You may add or remove strategies, but the known ladder provides the default ordering. Do NOT brainstorm from scratch.
+Constraints from PROBLEM_CLASS:
+- LOCALIZED → don't touch multiple modules
+- HYGIENE → no architectural strategies
+- BEHAVIORAL → prefer behavior changes without restructuring
 
-**If PROBLEM_CLASS is NOVEL or not set:**
-Generate ALL plausible strategies to achieve the goal.
+For each strategy: name concisely, describe changes (1-2 sentences), note invariants respected.
+Include narrow/safe, moderate, and wide/architectural approaches.
 
-**PROBLEM_CLASS constraints:**
-- If SCOPE=LOCALIZED, do NOT propose strategies that touch multiple modules
-- If CHANGE_TYPE=HYGIENE, do NOT propose architectural strategies
-- If CHANGE_TYPE=BEHAVIORAL, prefer strategies that change behavior without restructuring
-
-For each strategy:
-- Name it concisely (e.g., "feature-flag-gate", "extend-state-model", "replace-state-layer")
-- Describe what changes it requires (1-2 sentences)
-- Note which invariants it respects and which degrees of freedom it uses
-
-Include at least one narrow/safe approach, one moderate approach, and one wide/architectural approach.
-Include a workaround strategy if applicable (something that partially achieves the goal with minimal changes).
-
-Return structured findings:
+Return:
 STRATEGY_1=<name>: <description>
-STRATEGY_2=<name>: <description>
 ...
 STRATEGIES_RAW=<name1|name2|name3|...>`;
 }
@@ -168,34 +127,23 @@ STRATEGIES_RAW=<name1|name2|name3|...>`;
 // ── Phase 5: Strategy Ordering ─────────────────────────────────────
 
 export function promptStrategyOrderingComposer(): string {
-  return `You have raw candidate strategies. Now order them into a safety ladder.
+  return `Order raw strategies into a safety ladder (safest → most invasive).
 
-Spawn an Assessor with the INSTRUMENT_INSTRUCTIONS and REVIEW_CONTEXT blocks.
+Spawn Assessor with INSTRUMENT_INSTRUCTIONS and REVIEW_CONTEXT.
 
-Based on the Assessor's findings, use the RE_INVOCATION_TEMPLATE. Copy the ACCUMULATED_FLAGS as-is and append:
-  --strategies-ordered "<strategy1|strategy2|strategy3|...>"
-
-The order must go from safest/narrowest to most invasive/widest.`;
+Use RE_INVOCATION_TEMPLATE, copy ACCUMULATED_FLAGS as-is, append:
+  --strategies-ordered "<strategy1|strategy2|strategy3|...>"`;
 }
 
 export function promptStrategyOrderingInstrument(): string {
   return `Instrument-Assessor. ALLOWED TOOLS: semantic_search, grep_search, file_search, read_file, list_dir.
 
-Given STRATEGIES_RAW, INVARIANTS, QUALITY_CRITERIA, and DOMAIN:
+Order strategies safest → most invasive by priority:
+1. SCOPE (narrow first) 2. REVERSIBILITY (reversible first) 3. RISK (low first) 4. QUALITY (clean first)
 
-Order the strategies from safest to most invasive using these criteria (in priority order):
-1. SCOPE — narrow changes before wide changes
-2. REVERSIBILITY — easily reversible before hard to reverse
-3. RISK — low risk of breakage before high risk
-4. QUALITY — clean solutions before hacky workarounds
+For each: assign SCOPE narrow|moderate|wide, REVERSIBILITY reversible|partial|irreversible, RISK low|medium|high, QUALITY clean|acceptable|hacky.
 
-For each strategy, assign:
-- SCOPE: narrow | moderate | wide
-- REVERSIBILITY: reversible | partially-reversible | irreversible
-- RISK: low | medium | high
-- QUALITY: clean | acceptable | hacky
-
-Return structured findings:
+Return:
 ORDERING_RATIONALE=<why this order>
 STRATEGIES_ORDERED=<strategy1|strategy2|strategy3|...>`;
 }
@@ -203,107 +151,78 @@ STRATEGIES_ORDERED=<strategy1|strategy2|strategy3|...>`;
 // ── Phase 6: Verify Hook Definition ────────────────────────────────
 
 export function promptVerifyHookComposer(): string {
-  return `You have ordered strategies. Now define two tiers of verification hooks.
+  return `Define two tiers of verification hooks.
 
-Spawn an Assessor with the INSTRUMENT_INSTRUCTIONS and REVIEW_CONTEXT blocks.
+Spawn Assessor with INSTRUMENT_INSTRUCTIONS and REVIEW_CONTEXT.
 
-Based on the Assessor's findings, use the RE_INVOCATION_TEMPLATE. Copy the ACCUMULATED_FLAGS as-is and append:
-  --verify-hook-confirmed true --problem-hooks '[{"verify":"<command>"}, ...]' --strategy-hooks '[{"strategy":"<name>","verify":"<command>"}, ...]'
+Use RE_INVOCATION_TEMPLATE, copy ACCUMULATED_FLAGS as-is, append:
+  --verify-hook-confirmed true --problem-hooks '[{"verify":"<cmd>"}, ...]' --strategy-hooks '[{"strategy":"<name>","verify":"<cmd>"}, ...]'
 
-IMPORTANT: Problem hooks are derived from the SUCCESS_CONDITION — they verify the problem is solved regardless of which strategy was used. Strategy hooks are specific to each strategy and are discarded on escalation.`;
+Problem hooks = from SUCCESS_CONDITION (survive escalation). Strategy hooks = strategy-specific (discarded on escalation).`;
 }
 
 export function promptVerifyHookInstrument(): string {
   return `Instrument-Assessor. ALLOWED TOOLS: semantic_search, grep_search, file_search, read_file, list_dir.
 
-Given STRATEGIES_ORDERED, SUCCESS_CONDITION, GOAL, and DOMAIN:
+Define TWO TIERS of hooks:
 
-Define TWO TIERS of verification hooks:
+**Tier 1 — Problem-level** (from SUCCESS_CONDITION/GOAL only, survive escalation):
+Must NOT reference strategy details. E.g., "run: npm test", "check: endpoint returns 200".
 
-**Tier 1 — Problem-level hooks** (derived from SUCCESS_CONDITION and GOAL only):
-These verify the problem is solved regardless of which strategy was used. They survive strategy escalation.
-- Can be written purely from the success condition
-- Must NOT reference strategy-specific details (flag names, specific files, migration steps)
-- Examples: "run: npm test", "check: endpoint returns 200", "check: no TypeScript errors"
+**Tier 2 — Strategy-level** (strategy-specific, discarded on escalation):
+Reference strategy artifacts. E.g., "check: flag 'collab' in config".
 
-**Tier 2 — Strategy-level hooks** (specific to each strategy):
-These verify a particular strategy's implementation. They are DISCARDED when escalating to the next strategy.
-- Reference strategy-specific artifacts (a flag name, a file path, a config key)
-- Examples: "check: feature flag 'collab' exists in config", "check: migration file 001_add_collab.sql exists"
+Rule: derivable purely from SUCCESS_CONDITION+GOAL → problem-level. References strategy implementation → strategy-level.
 
-Classification rule: if a hook can be written purely from SUCCESS_CONDITION + GOAL, it's problem-level. If it references anything from a strategy's implementation, it's strategy-level.
-
-Return structured findings:
-PROBLEM_HOOKS=[
-  {"verify": "<command or check>"},
-  ...
-]
-STRATEGY_HOOKS=[
-  {"strategy": "<name>", "verify": "<command or check>"},
-  ...
-]`;
+Return:
+PROBLEM_HOOKS=[{"verify":"<cmd>"}, ...]
+STRATEGY_HOOKS=[{"strategy":"<name>","verify":"<cmd>"}, ...]`;
 }
 
 // ── Phase 7: Score Emission ────────────────────────────────────────
 
 export function promptScoreEmissionComposer(): string {
-  return `You have a complete, validated spec (or the spec has been approved by the human).
-
-If SPEC_APPROVED is NOT set in the REVIEW_CONTEXT: present the SPEC to the human for review. This is a HUMAN GATE — you must ask the user to approve before proceeding. When they approve, use the RE_INVOCATION_TEMPLATE and append:
+  return `If SPEC_APPROVED NOT set: present SPEC to human for review. HUMAN GATE — ask user to approve. On approval, use RE_INVOCATION_TEMPLATE, append:
   --spec-approved true
 
-If SPEC_APPROVED IS set: spawn an Executor to implement the top strategy from the spec. Then use the RE_INVOCATION_TEMPLATE and append:
+If SPEC_APPROVED IS set: spawn Executor to implement top strategy. Then append:
   --score-generated true`;
 }
 
 export function promptScoreEmissionInstrument(): string {
   return `Instrument-Assessor. ALLOWED TOOLS: read_file, list_dir.
 
-If this is a spec review (SPEC_APPROVED not set):
-Review the SPEC block for completeness. Verify that:
-1. Every strategy has a verify hook
-2. Strategies are ordered from safe to invasive
-3. Success condition is verifiable
-4. No invariants are violated by any strategy
+If spec review (SPEC_APPROVED not set):
+Verify: every strategy has a hook, strategies ordered safe→invasive, success condition verifiable, no invariant violations.
+Return: SPEC_VALID=YES|NO, SPEC_ISSUES=<if NO>
 
-Return:
-SPEC_VALID=YES|NO
-SPEC_ISSUES=<list of issues if NO>
-
-If SPEC_APPROVED is set:
-Confirm the spec is ready for score generation.
-Return:
-READY_TO_EMIT=YES`;
+If SPEC_APPROVED set:
+Return: READY_TO_EMIT=YES`;
 }
 
 // ── Phase 8: Score Execution ───────────────────────────────────────
 
 export function promptScoreExecutionComposer(): string {
-  return `The strategy has been implemented. Now verify it works.
+  return `Strategy implemented. Present execution plan to human for approval. HUMAN GATE.
 
-Present the execution plan to the human for approval. Show them:
-1. The strategies that were attempted (in order)
-2. The verify hooks that will be used
-3. That execution will follow the standard Symphony protocol
-
-This is a HUMAN GATE — you must ask the user to approve before proceeding.
-When the human approves, use the RE_INVOCATION_TEMPLATE and append:
+Show: strategies attempted, verify hooks to run, standard Symphony protocol.
+On approval, use RE_INVOCATION_TEMPLATE, append:
   --execution-approved true
 
-If the human declines, report that execution was declined and stop.`;
+If declined, report and stop.`;
 }
 
 export function promptScoreExecutionInstrument(): string {
   return `Instrument-Assessor. ALLOWED TOOLS: read_file, list_dir, grep_search.
 
-Review the generated score for execution readiness:
-1. Verify the generated score.sh exists and follows Symphony conventions (exit codes 0/1/2, judgment() calls)
-2. Verify prompts.sh has paired composer/instrument functions
-3. Verify every instrument prompt declares ALLOWED TOOLS
-4. Verify the strategy order matches the approved spec
+Review generated score for execution readiness:
+1. score.sh exists, follows Symphony conventions (exit codes 0/1/2, judgment() calls)
+2. prompts.sh has paired composer/instrument functions
+3. Every instrument declares ALLOWED TOOLS
+4. Strategy order matches approved spec
 
 Return:
 EXECUTION_READY=YES|NO
-EXECUTION_ISSUES=<list of issues if NO>
-STRATEGIES_TO_EXECUTE=<ordered list of strategy names>`;
+EXECUTION_ISSUES=<if NO>
+STRATEGIES_TO_EXECUTE=<ordered list>`;
 }

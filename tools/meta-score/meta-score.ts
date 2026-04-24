@@ -48,6 +48,24 @@ export interface ScoreResult {
   judgment?: JudgmentOutput;
 }
 
+export type PhaseHandler = (input: MetaScoreInput) => ScoreResult | null;
+
+export enum MetaScorePhase {
+  GoalDefinition = "goal-definition",
+  ConstraintMapping = "constraint-mapping",
+  ProblemClassification = "problem-classification",
+  StrategyDiscovery = "strategy-discovery",
+  StrategyOrdering = "strategy-ordering",
+  VerifyHook = "verify-hook",
+  ScoreEmission = "score-emission",
+  ScoreExecution = "score-execution",
+}
+
+export interface PhaseRegistry {
+  readonly entries: ReadonlyArray<{ phase: MetaScorePhase; handler: PhaseHandler }>;
+  readonly size: number;
+}
+
 // ── Prompt imports ─────────────────────────────────────────────────
 
 import {
@@ -118,7 +136,7 @@ function judgment(
     accumulated,
     "ACCUMULATED_FLAGS_END",
     `NEW_FLAGS_HINT: ${newFlagHint}`,
-    `RE_INVOCATION_TEMPLATE: meta-score ${accumulated} \\`,
+    `RE_INVOCATION_TEMPLATE: meta-score <ACCUMULATED_FLAGS> \\`,
     `  ${newFlagHint}`,
     `COMPOSER_INSTRUCTIONS_BEGIN`,
     composer,
@@ -153,9 +171,9 @@ function phaseGoalDefinition(input: MetaScoreInput): ScoreResult | null {
     promptGoalClarificationInstrument(),
     {
       GOAL: input.goal,
-      DOMAIN: input.domain ?? "",
-      CONSTRAINTS: input.constraints ?? "",
-      KNOWLEDGE_CONTEXT: input.knowledgeContext ?? "",
+      ...(input.domain && { DOMAIN: input.domain }),
+      ...(input.constraints && { CONSTRAINTS: input.constraints }),
+      ...(input.knowledgeContext && { KNOWLEDGE_CONTEXT: input.knowledgeContext }),
     },
     input,
     '--goal-confirmed "<confirmed goal>" --success-condition "<what done looks like>"',
@@ -173,11 +191,11 @@ function phaseConstraintMapping(input: MetaScoreInput): ScoreResult | null {
     promptConstraintMappingInstrument(),
     {
       GOAL: input.goal,
-      GOAL_CONFIRMED: input.goalConfirmed ?? "",
-      SUCCESS_CONDITION: input.successCondition ?? "",
-      DOMAIN: input.domain ?? "",
-      CONSTRAINTS: input.constraints ?? "",
-      KNOWLEDGE_CONTEXT: input.knowledgeContext ?? "",
+      ...(input.goalConfirmed && { GOAL_CONFIRMED: input.goalConfirmed }),
+      ...(input.successCondition && { SUCCESS_CONDITION: input.successCondition }),
+      ...(input.domain && { DOMAIN: input.domain }),
+      ...(input.constraints && { CONSTRAINTS: input.constraints }),
+      ...(input.knowledgeContext && { KNOWLEDGE_CONTEXT: input.knowledgeContext }),
     },
     input,
     '--constraints-confirmed true --invariants "<list>" --degrees-of-freedom "<list>" --quality-criteria "<list>"',
@@ -195,12 +213,12 @@ function phaseProblemClassification(input: MetaScoreInput): ScoreResult | null {
     promptProblemClassificationInstrument(),
     {
       GOAL: input.goal,
-      SUCCESS_CONDITION: input.successCondition ?? "",
-      INVARIANTS: input.invariants ?? "",
-      DEGREES_OF_FREEDOM: input.degreesOfFreedom ?? "",
-      QUALITY_CRITERIA: input.qualityCriteria ?? "",
-      DOMAIN: input.domain ?? "",
-      KNOWLEDGE_CONTEXT: input.knowledgeContext ?? "",
+      ...(input.successCondition && { SUCCESS_CONDITION: input.successCondition }),
+      ...(input.invariants && { INVARIANTS: input.invariants }),
+      ...(input.degreesOfFreedom && { DEGREES_OF_FREEDOM: input.degreesOfFreedom }),
+      ...(input.qualityCriteria && { QUALITY_CRITERIA: input.qualityCriteria }),
+      ...(input.domain && { DOMAIN: input.domain }),
+      ...(input.knowledgeContext && { KNOWLEDGE_CONTEXT: input.knowledgeContext }),
     },
     input,
     '--problem-class "<change_type>:<scope>:<known_shape_or_novel>"',
@@ -218,13 +236,13 @@ function phaseStrategyDiscovery(input: MetaScoreInput): ScoreResult | null {
     promptStrategyDiscoveryInstrument(),
     {
       GOAL: input.goal,
-      SUCCESS_CONDITION: input.successCondition ?? "",
-      INVARIANTS: input.invariants ?? "",
-      DEGREES_OF_FREEDOM: input.degreesOfFreedom ?? "",
-      QUALITY_CRITERIA: input.qualityCriteria ?? "",
-      PROBLEM_CLASS: input.problemClass ?? "",
-      DOMAIN: input.domain ?? "",
-      KNOWLEDGE_CONTEXT: input.knowledgeContext ?? "",
+      ...(input.successCondition && { SUCCESS_CONDITION: input.successCondition }),
+      ...(input.invariants && { INVARIANTS: input.invariants }),
+      ...(input.degreesOfFreedom && { DEGREES_OF_FREEDOM: input.degreesOfFreedom }),
+      ...(input.qualityCriteria && { QUALITY_CRITERIA: input.qualityCriteria }),
+      ...(input.problemClass && { PROBLEM_CLASS: input.problemClass }),
+      ...(input.domain && { DOMAIN: input.domain }),
+      ...(input.knowledgeContext && { KNOWLEDGE_CONTEXT: input.knowledgeContext }),
     },
     input,
     '--strategies-raw "<strategy1|strategy2|strategy3>"',
@@ -241,11 +259,11 @@ function phaseStrategyOrdering(input: MetaScoreInput): ScoreResult | null {
     promptStrategyOrderingComposer(),
     promptStrategyOrderingInstrument(),
     {
-      STRATEGIES_RAW: input.strategiesRaw ?? "",
-      INVARIANTS: input.invariants ?? "",
-      QUALITY_CRITERIA: input.qualityCriteria ?? "",
-      DOMAIN: input.domain ?? "",
-      KNOWLEDGE_CONTEXT: input.knowledgeContext ?? "",
+      ...(input.strategiesRaw && { STRATEGIES_RAW: input.strategiesRaw }),
+      ...(input.invariants && { INVARIANTS: input.invariants }),
+      ...(input.qualityCriteria && { QUALITY_CRITERIA: input.qualityCriteria }),
+      ...(input.domain && { DOMAIN: input.domain }),
+      ...(input.knowledgeContext && { KNOWLEDGE_CONTEXT: input.knowledgeContext }),
     },
     input,
     '--strategies-ordered "<strategy1|strategy2|strategy3>"',
@@ -262,11 +280,11 @@ function phaseVerifyHook(input: MetaScoreInput): ScoreResult | null {
     promptVerifyHookComposer(),
     promptVerifyHookInstrument(),
     {
-      STRATEGIES_ORDERED: input.strategiesOrdered ?? "",
-      SUCCESS_CONDITION: input.successCondition ?? "",
+      ...(input.strategiesOrdered && { STRATEGIES_ORDERED: input.strategiesOrdered }),
+      ...(input.successCondition && { SUCCESS_CONDITION: input.successCondition }),
       GOAL: input.goal,
-      DOMAIN: input.domain ?? "",
-      KNOWLEDGE_CONTEXT: input.knowledgeContext ?? "",
+      ...(input.domain && { DOMAIN: input.domain }),
+      ...(input.knowledgeContext && { KNOWLEDGE_CONTEXT: input.knowledgeContext }),
     },
     input,
     `--verify-hook-confirmed true --problem-hooks '[{"verify":"<command>"}]' --strategy-hooks '[{"strategy":"<name>","verify":"<command>"}]'`,
@@ -363,7 +381,21 @@ function phaseScoreExecution(input: MetaScoreInput): ScoreResult | null {
 
 // ── Main state machine ─────────────────────────────────────────────
 
-const MAX_INVOCATIONS = 16;
+const phaseRegistry: PhaseRegistry = {
+  entries: [
+    { phase: MetaScorePhase.GoalDefinition, handler: phaseGoalDefinition },
+    { phase: MetaScorePhase.ConstraintMapping, handler: phaseConstraintMapping },
+    { phase: MetaScorePhase.ProblemClassification, handler: phaseProblemClassification },
+    { phase: MetaScorePhase.StrategyDiscovery, handler: phaseStrategyDiscovery },
+    { phase: MetaScorePhase.StrategyOrdering, handler: phaseStrategyOrdering },
+    { phase: MetaScorePhase.VerifyHook, handler: phaseVerifyHook },
+    { phase: MetaScorePhase.ScoreEmission, handler: phaseScoreEmission },
+    { phase: MetaScorePhase.ScoreExecution, handler: phaseScoreExecution },
+  ],
+  size: 8,
+};
+
+const MAX_INVOCATIONS = phaseRegistry.size * 2;
 let invocationCount = 0;
 
 export function runMetaScore(input: MetaScoreInput): ScoreResult {
@@ -383,20 +415,8 @@ export function runMetaScore(input: MetaScoreInput): ScoreResult {
     };
   }
 
-  // The 5 invariant phases + score emission + execution, in order
-  const phases: Array<(input: MetaScoreInput) => ScoreResult | null> = [
-    phaseGoalDefinition,
-    phaseConstraintMapping,
-    phaseProblemClassification,
-    phaseStrategyDiscovery,
-    phaseStrategyOrdering,
-    phaseVerifyHook,
-    phaseScoreEmission,
-    phaseScoreExecution,
-  ];
-
-  for (const phase of phases) {
-    const result = phase(input);
+  for (const { handler } of phaseRegistry.entries) {
+    const result = handler(input);
     if (result !== null) {
       return result; // Phase needs judgment — pause
     }
