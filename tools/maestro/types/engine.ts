@@ -1,5 +1,5 @@
 import type { Pattern } from "../../patterns";
-import type { ExecutableScore, PerformedBeat } from "../../symphony/types";
+import type { ExecutableScore, Performance, PerformedBeat } from "../../symphony/types";
 import type { Pause } from "./pause";
 import type { Complexity } from "./types";
 

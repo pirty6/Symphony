@@ -2,9 +2,9 @@
  * cli.ts — Maestro engine CLI driver.
  *
  * The engine is pure. This file is the sole I/O boundary: it reads
- * a prompt + an optional resolution from stdin/argv, advances the
- * engine, and emits the next Pause as JSON on stdout. Exit codes
- * mirror the Symphony protocol:
+ * a prompt + an optional resolution from argv, advances the engine,
+ * and emits the next Pause as JSON on stdout. Exit codes mirror the
+ * Symphony protocol:
  *
  *   0  = engine reached `done` (Performance available on stdout)
  *   1  = engine reached `failed` (protocol violation; error on stderr)
@@ -12,13 +12,13 @@
  *
  * Subcommands:
  *
- *   maestro start --prompt "<text>" [--state <file>]
+ *   maestro start   --prompt <text> --state <file>
  *     Initialize a new engine. Writes opaque state to --state, prints
  *     the first Pause on stdout, exits 2.
  *
  *   maestro resolve --state <file> --resolution <json>
- *     Apply one Resolution. Updates --state in place. Prints next Pause
- *     (exit 2) or final Performance (exit 0) or error (exit 1).
+ *     Apply one Resolution. Updates --state in place. Prints next
+ *     Pause (exit 2) or final Performance (exit 0) or error (exit 1).
  *
  * State file format is engine-internal and opaque to the caller.
  */
@@ -26,53 +26,16 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+import yargs from "yargs";
+import { hideBin } from "yargs/helpers";
+
 import { listPatterns } from "../patterns";
 import { advance, createEngine } from "./engine";
 import type { EngineState } from "./types/engine";
 import type { Resolution } from "./types/resolution";
 import { composerPromptFor, instrumentPromptFor } from "./prompts";
 
-interface CliArgs {
-  readonly command: string;
-  readonly prompt?: string;
-  readonly state?: string;
-  readonly resolution?: string;
-}
-
-function parseArgs(argv: readonly string[]): CliArgs {
-  const args = argv.slice(2);
-  const command = args[0] ?? "";
-  const out: Record<string, string> = {};
-  for (let i = 1; i < args.length; i += 1) {
-    const a = args[i];
-    if (!a.startsWith("--")) {continue;}
-    const eq = a.indexOf("=");
-    if (eq !== -1) {
-      out[a.substring(2, eq)] = a.substring(eq + 1);
-    } else if (i + 1 < args.length && !args[i + 1].startsWith("--")) {
-      i += 1;
-      out[a.substring(2)] = args[i];
-    }
-  }
-  return {
-    command,
-    prompt: out.prompt,
-    state: out.state,
-    resolution: out.resolution,
-  };
-}
-
-function usage(): never {
-  process.stderr.write(
-    [
-      "Usage:",
-      "  maestro start    --prompt <text> --state <file>",
-      "  maestro resolve  --state <file> --resolution <json>",
-      "",
-    ].join("\n"),
-  );
-  process.exit(1);
-}
+// ── IO helpers ─────────────────────────────────────────────────────
 
 function emitPauseAndExit(state: EngineState): never {
   if (state.kind !== "running") {
@@ -126,25 +89,22 @@ function readState(file: string): EngineState {
   return JSON.parse(raw) as EngineState;
 }
 
-function runStart(args: CliArgs): never {
-  const { prompt, state: stateFile } = args;
-  if (!prompt || !stateFile) {usage();}
-  const state = createEngine({
-    prompt,
-    patterns: listPatterns(),
-  });
+// ── Subcommand handlers ────────────────────────────────────────────
+
+function runStart(prompt: string, stateFile: string): never {
+  const state = createEngine({ prompt, patterns: listPatterns() });
   if (state.kind === "failed") {
     process.stderr.write(`ENGINE ERROR: ${state.error}\n`);
     process.exit(1);
   }
   writeState(stateFile, state);
-  if (state.kind === "running") {emitPauseAndExit(state);}
+  if (state.kind === "running") {
+    emitPauseAndExit(state);
+  }
   emitDoneAndExit(state);
 }
 
-function runResolve(args: CliArgs): never {
-  const { state: stateFile, resolution: resolutionRaw } = args;
-  if (!stateFile || !resolutionRaw) {usage();}
+function runResolve(stateFile: string, resolutionRaw: string): never {
   let resolution: Resolution;
   try {
     resolution = JSON.parse(resolutionRaw) as Resolution;
@@ -159,22 +119,60 @@ function runResolve(args: CliArgs): never {
     process.stderr.write(`ENGINE ERROR: ${next.error}\n`);
     process.exit(1);
   }
-  if (next.kind === "done") {emitDoneAndExit(next);}
+  if (next.kind === "done") {
+    emitDoneAndExit(next);
+  }
   emitPauseAndExit(next);
 }
 
-function main(): void {
-  const args = parseArgs(process.argv);
-  switch (args.command) {
-    case "start":
-      runStart(args);
-      break;
-    case "resolve":
-      runResolve(args);
-      break;
-    default:
-      usage();
-  }
+// ── CLI definition ─────────────────────────────────────────────────
+
+function maestroCli(): void {
+  yargs(hideBin(process.argv))
+    .scriptName("maestro")
+    .strict()
+    .version(false)
+    .command(
+      "start",
+      "Initialize a new engine run from a prompt and write opaque state to a file",
+      (y) =>
+        y
+          .option("prompt", {
+            describe: "User prompt to seed the engine with",
+            type: "string",
+            demandOption: true,
+          })
+          .option("state", {
+            describe: "Path to write opaque engine state to (created if missing)",
+            type: "string",
+            demandOption: true,
+          }),
+      ({ prompt, state }) => {
+        runStart(prompt, state);
+      },
+    )
+    .command(
+      "resolve",
+      "Apply one Resolution to a paused engine state and emit the next Pause or final Performance",
+      (y) =>
+        y
+          .option("state", {
+            describe: "Path to the engine state file written by `start` or a prior `resolve`",
+            type: "string",
+            demandOption: true,
+          })
+          .option("resolution", {
+            describe: "Resolution JSON; must echo the current Pause's pauseId",
+            type: "string",
+            demandOption: true,
+          }),
+      ({ state, resolution }) => {
+        runResolve(state, resolution);
+      },
+    )
+    .demandCommand(1, "Specify a subcommand: `start` or `resolve`.")
+    .help()
+    .parse();
 }
 
-main();
+maestroCli();
