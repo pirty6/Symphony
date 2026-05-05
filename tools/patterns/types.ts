@@ -24,7 +24,6 @@ import type {
   DomainKey,
   InstrumentType,
   Level,
-  Shape,
 } from "../symphony/types";
 
 /**
@@ -41,12 +40,6 @@ export interface PatternBeat {
   readonly instrument: InstrumentType;
   readonly directive: string;
 }
-
-/**
- * Complexity tier (1-4) — drives how many maestro debate voices spawn.
- * 1 trivial, 2 small, 3 typical, 4 novel/architectural.
- */
-export type ComplexityTier = 1 | 2 | 3 | 4;
 
 /**
  * The static, reusable skeleton owned by a Pattern.
@@ -66,8 +59,6 @@ export type ComplexityTier = 1 | 2 | 3 | 4;
 export interface PatternScore {
   readonly pattern: string;
   readonly domain: DomainKey;
-  readonly defaultComplexity: ComplexityTier;
-  readonly defaultShape: Shape;
   readonly beats: readonly PatternBeat[];
 }
 

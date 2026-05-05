@@ -11,8 +11,6 @@ import type { Pattern, PatternScore } from "./types";
 const score: PatternScore = {
   pattern: "feature",
   domain: "feature",
-  defaultComplexity: 3,
-  defaultShape: "layered",
   beats: [
     {
       step: "define",

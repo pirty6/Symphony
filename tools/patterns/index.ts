@@ -34,5 +34,4 @@ export type {
   Pattern,
   PatternScore,
   PatternBeat,
-  ComplexityTier,
 } from "./types";

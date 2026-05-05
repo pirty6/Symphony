@@ -32,8 +32,11 @@ import type {
   PerformedBeat,
   PerformedVoice,
 } from "../symphony/types";
+import { INSTRUMENTS } from "../symphony/types";
 import { compileScore } from "../compiler/compile";
 import { scaffoldPerformance } from "../symphony/perform";
+import { Pause, type Complexity, type PatternSummary } from "./types/pause";
+export { type Complexity, type PatternSummary } from "./types/pause";
 
 // ── Public types ────────────────────────────────────────────────────
 
@@ -47,90 +50,52 @@ export const MAESTRO_GO_PHRASES = [
 
 export const MAESTRO_DRAFT_MAX_ROUNDS = 6;
 
-export type DebateComplexity = 1 | 2 | 3 | 4;
+/** Producer of a voice output. Composer must declare which sub-agent ran. */
+export type VoiceProducer = "maestro-assessor" | "maestro-executor";
 
-export interface PatternSummary {
-  readonly pattern: string;
-  readonly matchedVerb: string;
-}
+export const VOICE_PRODUCERS: readonly VoiceProducer[] = [
+  "maestro-assessor",
+  "maestro-executor",
+] as const;
 
-export type Pause =
+/**
+ * Every Resolution carries the pauseId of the Pause it answers. The
+ * engine rejects any Resolution whose pauseId does not match the
+ * current running state's pauseId — including resubmissions of the
+ * same Resolution after the state has already advanced.
+ */
+export type Resolution =
   | {
       readonly kind: "match-pattern";
-      readonly payload: {
-        readonly prompt: string;
-        readonly candidates: readonly PatternSummary[];
-      };
-      readonly composerPrompt: string;
-      readonly instrumentPrompt: string;
+      readonly pauseId: string;
+      readonly chosen: string | "no-match";
     }
   | {
       readonly kind: "confirm-fit";
-      readonly payload: { readonly pattern: string; readonly matchedVerb: string };
-      readonly composerPrompt: string;
-      readonly instrumentPrompt: string;
+      readonly pauseId: string;
+      readonly ok: boolean;
+      readonly reroute?: string;
     }
   | {
       readonly kind: "draft-pattern-round";
-      readonly payload: {
-        readonly round: number;
-        readonly maxRounds: number;
-        readonly debateComplexity: DebateComplexity;
-        readonly priorDraft: Pattern | null;
-      };
-      readonly composerPrompt: string;
-      readonly instrumentPrompt: string;
-    }
-  | {
-      readonly kind: "elicit-context";
-      readonly payload: {
-        readonly pattern: string;
-        readonly missingKeys: readonly string[];
-        readonly collected: Readonly<Record<string, string>>;
-      };
-      readonly composerPrompt: string;
-      readonly instrumentPrompt: string;
-    }
-  | {
-      readonly kind: "go-gate";
-      readonly payload: {
-        readonly pattern: string;
-        readonly context: Readonly<Record<string, string>>;
-        readonly beats: number;
-      };
-      readonly composerPrompt: string;
-      readonly instrumentPrompt: string;
-    }
-  | {
-      readonly kind: "perform-beat";
-      readonly payload: {
-        readonly beatIndex: number;
-        readonly beat: Beat;
-        readonly previousOutputs: readonly string[];
-      };
-      readonly composerPrompt: string;
-      readonly instrumentPrompt: string;
-    };
-
-export type Resolution =
-  | { readonly kind: "match-pattern"; readonly chosen: string | "no-match" }
-  | { readonly kind: "confirm-fit"; readonly ok: boolean; readonly reroute?: string }
-  | {
-      readonly kind: "draft-pattern-round";
+      readonly pauseId: string;
       readonly outcome: "approve" | "edit" | "ambiguous";
       readonly nextDraft?: Pattern;
     }
   | {
       readonly kind: "elicit-context";
+      readonly pauseId: string;
       readonly values: Readonly<Record<string, string>>;
     }
-  | { readonly kind: "go-gate"; readonly phrase: string }
+  | { readonly kind: "go-gate"; readonly pauseId: string; readonly phrase: string }
   | {
       readonly kind: "perform-beat";
+      readonly pauseId: string;
       readonly voiceOutputs: readonly {
         readonly instrument: string;
         readonly output: string;
         readonly confidence: number;
+        readonly producedBy: VoiceProducer;
       }[];
       readonly verdict: MoveVerdict;
     };
@@ -139,9 +104,11 @@ export interface EngineConfig {
   readonly prompt: string;
   readonly patterns: readonly Pattern[];
   /** Optional initial complexity classification for draft-pattern. Defaults to 2. */
-  readonly debateComplexityHint?: DebateComplexity;
+  readonly debateComplexityHint?: Complexity;
   /** Optional clock injector used for startedAt. */
   readonly clock?: () => string;
+  /** Optional pauseId generator. Defaults to crypto.randomUUID. Tests inject a deterministic factory. */
+  readonly pauseIdFactory?: () => string;
 }
 
 export interface EngineResult {
@@ -168,7 +135,7 @@ export interface InternalState {
   readonly active: { readonly patternName: string; readonly matchedVerb: string } | null;
   readonly context: Readonly<Record<string, string>>;
   readonly draftRound: number;
-  readonly debateComplexityHint: DebateComplexity;
+  readonly debateComplexityHint: Complexity;
   readonly score: ExecutableScore | null;
   readonly performedBeats: readonly PerformedBeat[];
   readonly startedAt: string;
@@ -178,6 +145,7 @@ export interface InternalState {
 
 export function createEngine(config: EngineConfig): EngineState {
   const clock = config.clock ?? defaultClock;
+  const newPauseId = config.pauseIdFactory ?? defaultPauseIdFactory;
   const prompt = config.prompt;
   const candidates = matchVerbs(prompt, config.patterns);
 
@@ -194,18 +162,20 @@ export function createEngine(config: EngineConfig): EngineState {
   };
 
   if (candidates.length === 1) {
-    return enterConfirmFit(internal, candidates[0]);
+    return enterConfirmFit(internal, candidates[0], newPauseId);
   }
   if (candidates.length > 1) {
-    return runningPause(internal, makeMatchPatternPause(prompt, candidates));
+    return runningPause(internal, makeMatchPatternPause(prompt, candidates, newPauseId));
   }
-  return enterDraftPatternRound(internal, 1, null);
+  return enterDraftPatternRound(internal, 1, null, newPauseId);
 }
 
 // ── Reducer ────────────────────────────────────────────────────────
 
 export interface AdvanceOptions {
   readonly clock?: () => string;
+  /** Override the pauseId factory. Tests inject deterministic ids. */
+  readonly pauseIdFactory?: () => string;
 }
 
 export function advance(
@@ -217,6 +187,7 @@ export function advance(
   const pause = state.pause;
   const internal = state.internal;
   const clock = opts.clock ?? defaultClock;
+  const newPauseId = opts.pauseIdFactory ?? defaultPauseIdFactory;
 
   if (pause.kind !== resolution.kind) {
     return failed(
@@ -224,19 +195,34 @@ export function advance(
     );
   }
 
+  // Idempotency guard: every Resolution must echo the current Pause's
+  // pauseId. A resubmission against an already-advanced state file (or
+  // a stale resolution from a prior turn) is rejected here, not
+  // silently accepted as a fresh transition.
+  if (typeof resolution.pauseId !== "string" || resolution.pauseId === "") {
+    return failed(
+      `${pause.kind}: resolution.pauseId is required (expected '${pause.pauseId}')`,
+    );
+  }
+  if (resolution.pauseId !== pause.pauseId) {
+    return failed(
+      `${pause.kind}: pauseId mismatch (got '${resolution.pauseId}', expected '${pause.pauseId}')`,
+    );
+  }
+
   switch (pause.kind) {
     case "match-pattern":
-      return resolveMatchPattern(internal, resolution as MatchRes);
+      return resolveMatchPattern(internal, resolution as MatchRes, newPauseId);
     case "confirm-fit":
-      return resolveConfirmFit(internal, resolution as ConfirmRes);
+      return resolveConfirmFit(internal, resolution as ConfirmRes, newPauseId);
     case "draft-pattern-round":
-      return resolveDraftRound(internal, resolution as DraftRes, pause);
+      return resolveDraftRound(internal, resolution as DraftRes, pause, newPauseId);
     case "elicit-context":
-      return resolveElicitContext(internal, resolution as ElicitRes);
+      return resolveElicitContext(internal, resolution as ElicitRes, newPauseId);
     case "go-gate":
-      return resolveGoGate(internal, resolution as GoRes, clock);
+      return resolveGoGate(internal, resolution as GoRes, clock, newPauseId);
     case "perform-beat":
-      return resolvePerformBeat(internal, resolution as PerformRes, pause, clock);
+      return resolvePerformBeat(internal, resolution as PerformRes, pause, clock, newPauseId);
   }
 }
 
@@ -249,23 +235,35 @@ type ElicitRes = Extract<Resolution, { kind: "elicit-context" }>;
 type GoRes = Extract<Resolution, { kind: "go-gate" }>;
 type PerformRes = Extract<Resolution, { kind: "perform-beat" }>;
 
-function resolveMatchPattern(internal: InternalState, res: MatchRes): EngineState {
+function resolveMatchPattern(
+  internal: InternalState,
+  res: MatchRes,
+  nid: () => string,
+): EngineState {
   if (res.chosen === "no-match") {
-    return enterDraftPatternRound(internal, 1, null);
+    return enterDraftPatternRound(internal, 1, null, nid);
   }
   const target = findPattern(internal.patterns, res.chosen);
   if (!target) {
     return failed(`match-pattern: chosen '${res.chosen}' not registered`);
   }
-  return enterConfirmFit(internal, {
-    pattern: target.score.pattern,
-    matchedVerb: bestVerbFor(internal.prompt, target) ?? "(chosen)",
-  });
+  return enterConfirmFit(
+    internal,
+    {
+      pattern: target.score.pattern,
+      matchedVerb: bestVerbFor(internal.prompt, target) ?? "(chosen)",
+    },
+    nid,
+  );
 }
 
-function resolveConfirmFit(internal: InternalState, res: ConfirmRes): EngineState {
+function resolveConfirmFit(
+  internal: InternalState,
+  res: ConfirmRes,
+  nid: () => string,
+): EngineState {
   if (res.ok) {
-    return enterAfterConfirmFit(internal);
+    return enterAfterConfirmFit(internal, nid);
   }
   // ok=false with reroute → fresh confirm-fit on the new pattern.
   if (res.reroute) {
@@ -274,10 +272,14 @@ function resolveConfirmFit(internal: InternalState, res: ConfirmRes): EngineStat
       return failed(`confirm-fit: reroute target '${res.reroute}' not registered`);
     }
     const cleared: InternalState = { ...internal, active: null, context: {} };
-    return enterConfirmFit(cleared, {
-      pattern: target.score.pattern,
-      matchedVerb: bestVerbFor(internal.prompt, target) ?? "(rerouted)",
-    });
+    return enterConfirmFit(
+      cleared,
+      {
+        pattern: target.score.pattern,
+        matchedVerb: bestVerbFor(internal.prompt, target) ?? "(rerouted)",
+      },
+      nid,
+    );
   }
   // ok=false without reroute → user said wrong pattern but doesn't yet
   // know which one. Re-emit match-pattern with all registered patterns
@@ -287,13 +289,14 @@ function resolveConfirmFit(internal: InternalState, res: ConfirmRes): EngineStat
     matchedVerb: bestVerbFor(internal.prompt, p) ?? "(any)",
   }));
   const cleared: InternalState = { ...internal, active: null, context: {} };
-  return runningPause(cleared, makeMatchPatternPause(internal.prompt, all));
+  return runningPause(cleared, makeMatchPatternPause(internal.prompt, all, nid));
 }
 
 function resolveDraftRound(
   internal: InternalState,
   res: DraftRes,
   pause: Extract<Pause, { kind: "draft-pattern-round" }>,
+  nid: () => string,
 ): EngineState {
   if (res.outcome === "approve") {
     if (!res.nextDraft) {
@@ -303,12 +306,15 @@ function resolveDraftRound(
     // Add the approved draft to the registry and treat it as active.
     // Skip confirm-fit because the user just designed it.
     const augmentedPatterns = [...internal.patterns, draft];
-    return enterAfterConfirmFit({
-      ...internal,
-      patterns: augmentedPatterns,
-      active: { patternName: draft.score.pattern, matchedVerb: "(drafted)" },
-      context: {},
-    });
+    return enterAfterConfirmFit(
+      {
+        ...internal,
+        patterns: augmentedPatterns,
+        active: { patternName: draft.score.pattern, matchedVerb: "(drafted)" },
+        context: {},
+      },
+      nid,
+    );
   }
   // edit / ambiguous → next round (cap enforced in code).
   const next = pause.payload.round + 1;
@@ -321,6 +327,7 @@ function resolveDraftRound(
     internal,
     next,
     res.nextDraft ?? pause.payload.priorDraft,
+    nid,
   );
 }
 
@@ -329,6 +336,7 @@ function resolveDraftRound(
 function resolveElicitContext(
   internal: InternalState,
   res: ElicitRes,
+  nid: () => string,
 ): EngineState {
   if (!internal.active) return failed("elicit-context: no active pattern");
   const activePattern = findPattern(internal.patterns, internal.active.patternName);
@@ -344,22 +352,23 @@ function resolveElicitContext(
   const missing = required.filter((k) => !merged[k]);
   const next: InternalState = { ...internal, context: merged };
   if (missing.length > 0) {
-    return runningPause(next, makeElicitPause(activePattern, merged, missing));
+    return runningPause(next, makeElicitPause(activePattern, merged, missing, nid));
   }
-  return enterGoGate(next);
+  return enterGoGate(next, nid);
 }
 
 function resolveGoGate(
   internal: InternalState,
   res: GoRes,
   clock: () => string,
+  nid: () => string,
 ): EngineState {
   if (!internal.active) return failed("go-gate: no active pattern");
   const activePattern = findPattern(internal.patterns, internal.active.patternName);
   if (!activePattern) return failed("go-gate: active pattern not registered");
   const phrase = res.phrase.trim().toLowerCase();
   if (!(MAESTRO_GO_PHRASES as readonly string[]).includes(phrase)) {
-    return runningPause(internal, makeGoGatePause(activePattern, internal.context));
+    return runningPause(internal, makeGoGatePause(activePattern, internal.context, nid));
   }
   let score: ExecutableScore;
   try {
@@ -376,7 +385,7 @@ function resolveGoGate(
     performedBeats: [],
     startedAt: clock(),
   };
-  return enterPerformBeat(seeded, 0);
+  return enterPerformBeat(seeded, 0, nid);
 }
 
 // ── Phase 3 transitions ────────────────────────────────────────────
@@ -386,6 +395,7 @@ function resolvePerformBeat(
   res: PerformRes,
   pause: Extract<Pause, { kind: "perform-beat" }>,
   clock: () => string,
+  nid: () => string,
 ): EngineState {
   // Footnote-bug guard: validate voice output shape strictly before recording.
   const shapeError = validateVoiceOutputs(res.voiceOutputs, pause.payload.beat);
@@ -404,6 +414,7 @@ function resolvePerformBeat(
       instrument: v.instrument as PerformedVoice["instrument"],
       output: v.output,
       confidence: v.confidence,
+      producedBy: v.producedBy,
     })),
     verdict: res.verdict,
     stateHash: stateHashFor(internal.score.id, pause.payload.beatIndex),
@@ -418,7 +429,7 @@ function resolvePerformBeat(
   if (nextIndex >= internal.score.beats.length) {
     return finishRun(next, /*terminatedEarly*/ false, clock);
   }
-  return enterPerformBeat(next, nextIndex);
+  return enterPerformBeat(next, nextIndex, nid);
 }
 
 // ── State constructors ────────────────────────────────────────────
@@ -434,6 +445,7 @@ function failed(error: string): EngineState {
 function enterConfirmFit(
   internal: InternalState,
   summary: PatternSummary,
+  nid: () => string,
 ): EngineState {
   const target = findPattern(internal.patterns, summary.pattern);
   if (!target) return failed(`confirm-fit: pattern '${summary.pattern}' not registered`);
@@ -443,24 +455,25 @@ function enterConfirmFit(
   };
   return runningPause(next, {
     kind: "confirm-fit",
+    pauseId: nid(),
     payload: { pattern: summary.pattern, matchedVerb: summary.matchedVerb },
     composerPrompt: composerForConfirm(summary),
     instrumentPrompt: instrumentForConfirm(summary),
   });
 }
 
-function enterAfterConfirmFit(internal: InternalState): EngineState {
+function enterAfterConfirmFit(internal: InternalState, nid: () => string): EngineState {
   if (!internal.active) return failed("after-confirm-fit: no active pattern");
   const activePattern = findPattern(internal.patterns, internal.active.patternName);
   if (!activePattern) return failed("after-confirm-fit: active pattern not registered");
   const required = activePattern.requiredContext;
   if (required.length === 0) {
-    return enterGoGate(internal);
+    return enterGoGate(internal, nid);
   }
   const missing = required.filter((k) => !internal.context[k]);
   return runningPause(
     internal,
-    makeElicitPause(activePattern, internal.context, missing),
+    makeElicitPause(activePattern, internal.context, missing, nid),
   );
 }
 
@@ -468,15 +481,17 @@ function enterDraftPatternRound(
   internal: InternalState,
   round: number,
   priorDraft: Pattern | null,
+  nid: () => string,
 ): EngineState {
   const complexity = pickDebateComplexity(round, internal.debateComplexityHint);
   const next: InternalState = { ...internal, draftRound: round };
   return runningPause(next, {
     kind: "draft-pattern-round",
+    pauseId: nid(),
     payload: {
       round,
       maxRounds: MAESTRO_DRAFT_MAX_ROUNDS,
-      debateComplexity: complexity,
+      complexity,
       priorDraft,
     },
     composerPrompt: composerForDraft(round, complexity, priorDraft),
@@ -484,17 +499,21 @@ function enterDraftPatternRound(
   });
 }
 
-function enterGoGate(internal: InternalState): EngineState {
+function enterGoGate(internal: InternalState, nid: () => string): EngineState {
   if (!internal.active) return failed("go-gate: no active pattern");
   const activePattern = findPattern(internal.patterns, internal.active.patternName);
   if (!activePattern) return failed("go-gate: active pattern not registered");
   return runningPause(
     internal,
-    makeGoGatePause(activePattern, internal.context),
+    makeGoGatePause(activePattern, internal.context, nid),
   );
 }
 
-function enterPerformBeat(internal: InternalState, beatIndex: number): EngineState {
+function enterPerformBeat(
+  internal: InternalState,
+  beatIndex: number,
+  nid: () => string,
+): EngineState {
   if (!internal.score) return failed("perform-beat: no compiled score");
   const beat = internal.score.beats[beatIndex];
   if (!beat) return failed(`perform-beat: out-of-range index ${beatIndex}`);
@@ -503,6 +522,7 @@ function enterPerformBeat(internal: InternalState, beatIndex: number): EngineSta
   );
   return runningPause(internal, {
     kind: "perform-beat",
+    pauseId: nid(),
     payload: { beatIndex, beat, previousOutputs },
     composerPrompt: composerForPerform(beatIndex, beat),
     instrumentPrompt: instrumentForPerform(beatIndex, beat),
@@ -533,9 +553,11 @@ function finishRun(
 function makeMatchPatternPause(
   prompt: string,
   candidates: readonly PatternSummary[],
+  nid: () => string,
 ): Pause {
   return {
     kind: "match-pattern",
+    pauseId: nid(),
     payload: { prompt, candidates },
     composerPrompt: composerForMatch(prompt, candidates),
     instrumentPrompt: instrumentForMatch(prompt, candidates),
@@ -546,9 +568,11 @@ function makeElicitPause(
   pattern: Pattern,
   collected: Readonly<Record<string, string>>,
   missingKeys: readonly string[],
+  nid: () => string,
 ): Pause {
   return {
     kind: "elicit-context",
+    pauseId: nid(),
     payload: { pattern: pattern.score.pattern, missingKeys, collected },
     composerPrompt: composerForElicit(pattern, missingKeys, collected),
     instrumentPrompt: instrumentForElicit(pattern, missingKeys, collected),
@@ -558,9 +582,11 @@ function makeElicitPause(
 function makeGoGatePause(
   pattern: Pattern,
   context: Readonly<Record<string, string>>,
+  nid: () => string,
 ): Pause {
   return {
     kind: "go-gate",
+    pauseId: nid(),
     payload: {
       pattern: pattern.score.pattern,
       context,
@@ -588,6 +614,9 @@ function validateVoiceOutputs(
     if (typeof v?.instrument !== "string" || v.instrument === "") {
       return `voiceOutputs[${i}].instrument must be a non-empty string`;
     }
+    if (!(INSTRUMENTS as readonly string[]).includes(v.instrument)) {
+      return `voiceOutputs[${i}].instrument '${v.instrument}' is not one of: ${INSTRUMENTS.join(", ")}`;
+    }
     if (typeof v?.output !== "string") {
       return `voiceOutputs[${i}].output must be a string`;
     }
@@ -598,6 +627,12 @@ function validateVoiceOutputs(
       v.confidence > 1
     ) {
       return `voiceOutputs[${i}].confidence must be a number in [0,1]`;
+    }
+    if (
+      typeof v?.producedBy !== "string" ||
+      !(VOICE_PRODUCERS as readonly string[]).includes(v.producedBy)
+    ) {
+      return `voiceOutputs[${i}].producedBy must be one of: ${VOICE_PRODUCERS.join(", ")}`;
     }
   }
   return null;
@@ -652,12 +687,12 @@ function matchVerbs(
 
 function pickDebateComplexity(
   round: number,
-  hint: DebateComplexity,
-): DebateComplexity {
+  hint: Complexity,
+): Complexity {
   // Round 1 honors the caller's classification. Subsequent rounds may
   // escalate one tier per round, capped at 4. This keeps the doc's
   // "classify up-front" intent while allowing escalation on stalls.
-  const escalated = Math.min(4, hint + Math.max(0, round - 1)) as DebateComplexity;
+  const escalated = Math.min(4, hint + Math.max(0, round - 1)) as Complexity;
   return escalated;
 }
 
@@ -676,6 +711,10 @@ function deriveOutcome(
 
 function defaultClock(): string {
   return new Date().toISOString();
+}
+
+function defaultPauseIdFactory(): string {
+  return crypto.randomUUID();
 }
 
 function stateHashFor(scoreId: string, beatIndex: number): string {
@@ -708,7 +747,7 @@ function instrumentForConfirm(_s: PatternSummary): string {
 
 function composerForDraft(
   round: number,
-  complexity: DebateComplexity,
+  complexity: Complexity,
   priorDraft: Pattern | null,
 ): string {
   return [
@@ -721,7 +760,7 @@ function composerForDraft(
 }
 function instrumentForDraft(
   round: number,
-  complexity: DebateComplexity,
+  complexity: Complexity,
   _priorDraft: Pattern | null,
 ): string {
   return `Round ${round}; complexity ${complexity}. Spawn proposer${

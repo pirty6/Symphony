@@ -60,16 +60,6 @@ export const INSTRUMENTS: readonly InstrumentType[] = [
 
 export type DomainKey = string;
 
-// ── Tempo ──────────────────────────────────────────────────────────
-// NOTE: TempoConfig is currently empty. Its previous fields
-// (`conservatism`, `beatsPerMeasure`) were removed because no consumer
-// branched on them. The wrapper is retained pending decision #7 from
-// runs/investigate-cleanup-targets: delete TempoConfig entirely, or
-// repopulate it with fields a real executor will read. Use `{}` at
-// construction sites until that decision is made.
-
-export type TempoConfig = Record<string, never>;
-
 // ── Problem Fingerprint ────────────────────────────────────────────
 // Two hashes side by side. v1 canonicalizer is identity, so the two
 // hashes are equal in v1. They diverge once a non-trivial canonicalizer
@@ -83,26 +73,17 @@ export interface ProblemFingerprint {
 }
 
 // ── Frequency Map ──────────────────────────────────────────────────
-// Static decomposition. "What levels does this problem contain, and
-// at what amplitude?" Catalog matching operates on this, not on Score.
-
-export type Shape =
-  | "localized"
-  | "layered"
-  | "architectural"
-  | "philosophical";
+// Static decomposition. "Which levels does this problem actively
+// touch?" Catalog matching operates on this, not on Score.
 
 export interface FrequencyMap {
-  /** Amplitude in [0, 1] at each level. All 8 keys present. */
-  readonly levels: Readonly<Record<Level, number>>;
-  /** Levels whose amplitude is at or above the dominance threshold. */
-  readonly dominantLevels: readonly Level[];
-  readonly shape: Shape;
   readonly key: DomainKey;
+  /** Levels whose share of beats is at or above the activity threshold. */
+  readonly activeLevels: readonly Level[];
 }
 
-/** Default amplitude threshold for `dominantLevels` membership. */
-export const DOMINANCE_THRESHOLD = 0.3;
+/** Minimum share of beats a level needs to count as active. */
+export const LEVEL_ACTIVITY_THRESHOLD = 0.3;
 
 // ── Verdict ───────────────────────────────────────────────────────────
 
@@ -132,7 +113,7 @@ export interface Beat {
 
 export interface ExecutableScore {
   readonly schemaVersion: 1;
-  /** Deterministic id: hash of (frequencyMap + tempo + beats + generatedFrom + pattern? + context?). */
+  /** Deterministic id: hash of (frequencyMap + beats + generatedFrom + pattern? + context?). */
   readonly id: string;
   /**
    * Derived from the beat histogram at compile time. Lives only on
@@ -141,7 +122,6 @@ export interface ExecutableScore {
    * different complexity scaling could produce different FrequencyMaps.
    */
   readonly frequencyMap: FrequencyMap;
-  readonly tempo: TempoConfig;
   readonly beats: readonly Beat[];
   readonly generatedAt: string;
   readonly generatedFrom: ProblemFingerprint;
@@ -169,6 +149,12 @@ export interface PerformedVoice {
   readonly instrument: InstrumentType;
   readonly output: string;
   readonly confidence: number;
+  /**
+   * Sub-agent that produced this voice output. Optional for back-compat
+   * with saved runs predating the field; required on new perform-beat
+   * resolutions (enforced in tools/maestro/engine.ts).
+   */
+  readonly producedBy?: "maestro-assessor" | "maestro-executor";
 }
 
 export interface PerformedBeat {
@@ -258,7 +244,7 @@ export type Legality = "legal" | "unusual" | "illegal";
 // algorithm in maestro phase 2 (there is no separate fallback CLI).
 
 export type FallbackCondition =
-  | { readonly reason: "no-dominant-levels"; readonly detail: string }
+  | { readonly reason: "no-active-levels"; readonly detail: string }
   | { readonly reason: "illegible-problem"; readonly detail: string }
   | { readonly reason: "pure-mechanical"; readonly detail: string }
   | { readonly reason: "schema-version-mismatch"; readonly detail: string };

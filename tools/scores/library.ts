@@ -15,7 +15,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import type { Level, PerformanceOutcome, Shape } from "../symphony/types";
+import type { Level, PerformanceOutcome } from "../symphony/types";
 import { loadRun } from "../symphony/persistence";
 
 const STORE_DIR = path.join("tools", "scores", "store");
@@ -28,8 +28,7 @@ export interface SavedRunIndexEntry {
   readonly timestamp: string;
   readonly file: string;
   readonly domain: string;
-  readonly shape: Shape;
-  readonly dominantLevels: readonly Level[];
+  readonly activeLevels: readonly Level[];
   readonly outcome: PerformanceOutcome;
   readonly beats: number;
 }
@@ -77,8 +76,7 @@ export function buildLibraryIndex(
         timestamp: run.timestamp,
         file: path.relative(".", file),
         domain: run.executableScore.frequencyMap.key,
-        shape: run.executableScore.frequencyMap.shape,
-        dominantLevels: run.executableScore.frequencyMap.dominantLevels,
+        activeLevels: run.executableScore.frequencyMap.activeLevels,
         outcome: run.performance.outcome,
         beats: run.executableScore.beats.length,
       });

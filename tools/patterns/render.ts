@@ -28,8 +28,6 @@ export function renderPatternMarkdown(pattern: Pattern): string {
   lines.push("---");
   lines.push(`pattern: ${ps.pattern}`);
   lines.push(`domain: ${ps.domain}`);
-  lines.push(`default-complexity: ${ps.defaultComplexity}`);
-  lines.push(`default-shape: ${ps.defaultShape}`);
   lines.push(`verb-triggers: [${formatTriggers(pattern.verbTriggers)}]`);
   lines.push(
     `required-context: ${pattern.requiredContext.length === 0 ? "[]" : `[${pattern.requiredContext.join(", ")}]`}`,

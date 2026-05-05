@@ -18,7 +18,7 @@
 
 import { fingerprintProblem, computeExecutableScoreId } from "./persistence";
 import {
-  DOMINANCE_THRESHOLD,
+  LEVEL_ACTIVITY_THRESHOLD,
   LEVELS,
   type Beat,
 
@@ -27,8 +27,6 @@ import {
   type InstrumentType,
   type Level,
   type ExecutableScore,
-  type Shape,
-  type TempoConfig,
   type Voice,
 } from "./types";
 
@@ -54,10 +52,6 @@ export interface AlgorithmInput {
   readonly domain: DomainKey;
   readonly steps: readonly AlgorithmStep[];
   readonly annotations: readonly AlgorithmAnnotation[];
-  /** Optional. Defaults to `{}` (placeholder pending decision #7). */
-  readonly tempo?: TempoConfig;
-  /** Optional. Defaults to "layered". */
-  readonly shape?: Shape;
   /** Optional. Defaults to new Date().toISOString(). Override for determinism in tests. */
   readonly generatedAt?: string;
 }
@@ -67,7 +61,6 @@ export interface AlgorithmInput {
 function buildFrequencyMap(
   beats: readonly Beat[],
   domain: DomainKey,
-  shape: Shape,
 ): FrequencyMap {
   const counts: Record<Level, number> = {
     1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0,
@@ -75,18 +68,11 @@ function buildFrequencyMap(
   for (const beat of beats) counts[beat.level]++;
   const total = beats.length;
 
-  const levels: Record<Level, number> = {
-    1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0,
-  };
-  for (const level of LEVELS) {
-    levels[level] = total === 0 ? 0 : counts[level] / total;
-  }
+  const activeLevels = total === 0
+    ? []
+    : LEVELS.filter((l) => counts[l] / total >= LEVEL_ACTIVITY_THRESHOLD);
 
-  const dominantLevels = LEVELS.filter(
-    (l) => levels[l] >= DOMINANCE_THRESHOLD,
-  );
-
-  return { levels, dominantLevels, shape, key: domain };
+  return { key: domain, activeLevels };
 }
 
 // ── Public API ─────────────────────────────────────────────────────
@@ -138,16 +124,12 @@ export function parseAlgorithm(input: AlgorithmInput): ExecutableScore {
     }
   }
 
-  const tempo: TempoConfig = input.tempo ?? ({} as TempoConfig);
-  const shape: Shape = input.shape ?? "layered";
-
-  const frequencyMap = buildFrequencyMap(beats, input.domain, shape);
+  const frequencyMap = buildFrequencyMap(beats, input.domain);
   const generatedFrom = fingerprintProblem(input.problem);
 
   const partial: Omit<ExecutableScore, "id" | "generatedAt"> = {
     schemaVersion: 1,
     frequencyMap,
-    tempo,
     beats,
     generatedFrom,
   };

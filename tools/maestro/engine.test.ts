@@ -45,6 +45,13 @@ function expectPause<K extends Pause["kind"]>(
   return state.pause as Extract<Pause, { kind: K }>;
 }
 
+function pid(state: ReturnType<typeof createEngine>): string {
+  if (state.kind !== "running") {
+    throw new Error(`pid: state is ${state.kind}, expected running`);
+  }
+  return state.pause.pauseId;
+}
+
 // ── Phase 1: match-pattern ─────────────────────────────────────────
 
 describe("match-pattern routing", () => {
@@ -87,7 +94,7 @@ describe("confirm-fit", () => {
       prompt: "rename loadScore to loadExecutableScore",
       patterns: allPatterns,
     });
-    const s1 = advance(s0, { kind: "confirm-fit", ok: true });
+    const s1 = advance(s0, { kind: "confirm-fit", pauseId: pid(s0), ok: true });
     const pause = expectPause(s1, "elicit-context");
     expect(pause.payload.pattern).toBe("refactor");
     expect(pause.payload.missingKeys).toEqual(["target", "invariant"]);
@@ -98,8 +105,7 @@ describe("confirm-fit", () => {
       prompt: "rename loadScore to loadExecutableScore",
       patterns: allPatterns,
     });
-    const s1 = advance(s0, {
-      kind: "confirm-fit",
+    const s1 = advance(s0, { kind: "confirm-fit", pauseId: pid(s0),
       ok: false,
       reroute: "investigate",
     });
@@ -114,7 +120,7 @@ describe("confirm-fit", () => {
       prompt: "rename loadScore to loadExecutableScore",
       patterns: allPatterns,
     });
-    const s1 = advance(s0, { kind: "confirm-fit", ok: false });
+    const s1 = advance(s0, { kind: "confirm-fit", pauseId: pid(s0), ok: false });
     // User said wrong pattern but doesn't yet know which. Engine offers
     // every registered pattern as a candidate (or 'no-match' to draft).
     const pause = expectPause(s1, "match-pattern");
@@ -127,8 +133,7 @@ describe("confirm-fit", () => {
       prompt: "rename loadScore to loadExecutableScore",
       patterns: allPatterns,
     });
-    const s1 = advance(s0, {
-      kind: "confirm-fit",
+    const s1 = advance(s0, { kind: "confirm-fit", pauseId: pid(s0),
       ok: false,
       reroute: "nonexistent-pattern",
     });
@@ -145,13 +150,12 @@ describe("elicit-context", () => {
       prompt: "rename loadScore to loadExecutableScore",
       patterns: allPatterns,
     });
-    return advance(s0, { kind: "confirm-fit", ok: true });
+    return advance(s0, { kind: "confirm-fit", pauseId: pid(s0), ok: true });
   }
 
   test("empty value re-emits elicit-context with key still missing", () => {
     const s0 = reachElicit();
-    const s1 = advance(s0, {
-      kind: "elicit-context",
+    const s1 = advance(s0, { kind: "elicit-context", pauseId: pid(s0),
       values: { target: "", invariant: "imports type-check" },
     });
     const pause = expectPause(s1, "elicit-context");
@@ -160,8 +164,7 @@ describe("elicit-context", () => {
 
   test("whitespace-only value treated as empty", () => {
     const s0 = reachElicit();
-    const s1 = advance(s0, {
-      kind: "elicit-context",
+    const s1 = advance(s0, { kind: "elicit-context", pauseId: pid(s0),
       values: { target: "   ", invariant: "imports type-check" },
     });
     const pause = expectPause(s1, "elicit-context");
@@ -170,8 +173,7 @@ describe("elicit-context", () => {
 
   test("all keys filled advances to go-gate", () => {
     const s0 = reachElicit();
-    const s1 = advance(s0, {
-      kind: "elicit-context",
+    const s1 = advance(s0, { kind: "elicit-context", pauseId: pid(s0),
       values: { target: "rename loadScore", invariant: "imports type-check" },
     });
     expectPause(s1, "go-gate");
@@ -179,8 +181,7 @@ describe("elicit-context", () => {
 
   test("extra unknown keys are dropped silently (forward-compat)", () => {
     const s0 = reachElicit();
-    const s1 = advance(s0, {
-      kind: "elicit-context",
+    const s1 = advance(s0, { kind: "elicit-context", pauseId: pid(s0),
       values: {
         target: "rename loadScore",
         invariant: "imports type-check",
@@ -199,16 +200,15 @@ describe("go-gate", () => {
       prompt: "rename loadScore to loadExecutableScore",
       patterns: allPatterns,
     });
-    const s1 = advance(s0, { kind: "confirm-fit", ok: true });
-    return advance(s1, {
-      kind: "elicit-context",
+    const s1 = advance(s0, { kind: "confirm-fit", pauseId: pid(s0), ok: true });
+    return advance(s1, { kind: "elicit-context", pauseId: pid(s1),
       values: { target: "rename loadScore", invariant: "imports type-check" },
     });
   }
 
   test.each(MAESTRO_GO_PHRASES)("'%s' advances to perform-beat 0", (phrase) => {
     const s0 = reachGate();
-    const s1 = advance(s0, { kind: "go-gate", phrase });
+    const s1 = advance(s0, { kind: "go-gate", pauseId: pid(s0), phrase });
     const pause = expectPause(s1, "perform-beat");
     expect(pause.payload.beatIndex).toBe(0);
   });
@@ -223,13 +223,13 @@ describe("go-gate", () => {
     "  ",
   ])("vague phrase '%s' re-emits go-gate", (phrase) => {
     const s0 = reachGate();
-    const s1 = advance(s0, { kind: "go-gate", phrase });
+    const s1 = advance(s0, { kind: "go-gate", pauseId: pid(s0), phrase });
     expectPause(s1, "go-gate");
   });
 
   test("phrase match is case-insensitive and trims whitespace", () => {
     const s0 = reachGate();
-    const s1 = advance(s0, { kind: "go-gate", phrase: "  GO  " });
+    const s1 = advance(s0, { kind: "go-gate", pauseId: pid(s0), phrase: "  GO  " });
     expectPause(s1, "perform-beat");
   });
 });
@@ -266,8 +266,7 @@ describe("draft-pattern MAX_ROUNDS", () => {
     for (let i = 0; i < 6; i++) {
       const pause = expectPause(state, "draft-pattern-round");
       expect(pause.payload.round).toBe(i + 1);
-      state = advance(state, {
-        kind: "draft-pattern-round",
+      state = advance(state, { kind: "draft-pattern-round", pauseId: pid(state),
         outcome: "edit",
       });
     }
@@ -284,8 +283,7 @@ describe("draft-pattern MAX_ROUNDS", () => {
       patterns: allPatterns,
     });
     expectPause(s0, "draft-pattern-round");
-    const s1 = advance(s0, {
-      kind: "draft-pattern-round",
+    const s1 = advance(s0, { kind: "draft-pattern-round", pauseId: pid(s0),
       outcome: "approve",
       nextDraft: makeStubPattern("frobnicate"),
     });
@@ -306,18 +304,17 @@ describe("perform-beat shape validation", () => {
       patterns: allPatterns,
     });
     // 'understand' uniquely matches investigate (no requiredContext).
-    const s1 = advance(s0, { kind: "confirm-fit", ok: true });
-    return advance(s1, { kind: "go-gate", phrase: "go" });
+    const s1 = advance(s0, { kind: "confirm-fit", pauseId: pid(s0), ok: true });
+    return advance(s1, { kind: "go-gate", pauseId: pid(s1), phrase: "go" });
   }
 
   test("valid voice output advances to next beat", () => {
     const s0 = reachPerform();
     const pause0 = expectPause(s0, "perform-beat");
     expect(pause0.payload.beatIndex).toBe(0);
-    const s1 = advance(s0, {
-      kind: "perform-beat",
+    const s1 = advance(s0, { kind: "perform-beat", pauseId: pid(s0),
       voiceOutputs: [
-        { instrument: "percussion", output: "restated", confidence: 0.9 },
+        { instrument: "percussion", output: "restated", confidence: 0.9, producedBy: "maestro-assessor" },
       ],
       verdict: {
         outcome: "applied",
@@ -332,8 +329,7 @@ describe("perform-beat shape validation", () => {
 
   test("missing instrument field → engine fails (footnote-bug guard)", () => {
     const s0 = reachPerform();
-    const s1 = advance(s0, {
-      kind: "perform-beat",
+    const s1 = advance(s0, { kind: "perform-beat", pauseId: pid(s0),
       // @ts-expect-error intentional bad shape
       voiceOutputs: [{ output: "x", confidence: 0.9 }],
       verdict: {
@@ -349,11 +345,10 @@ describe("perform-beat shape validation", () => {
 
   test("non-string output → engine fails", () => {
     const s0 = reachPerform();
-    const s1 = advance(s0, {
-      kind: "perform-beat",
+    const s1 = advance(s0, { kind: "perform-beat", pauseId: pid(s0),
       voiceOutputs: [
         // @ts-expect-error intentional bad shape
-        { instrument: "percussion", output: 42, confidence: 0.9 },
+        { instrument: "percussion", output: 42, confidence: 0.9, producedBy: "maestro-assessor" },
       ],
       verdict: {
         outcome: "applied",
@@ -367,10 +362,9 @@ describe("perform-beat shape validation", () => {
 
   test("confidence out of [0,1] → engine fails", () => {
     const s0 = reachPerform();
-    const s1 = advance(s0, {
-      kind: "perform-beat",
+    const s1 = advance(s0, { kind: "perform-beat", pauseId: pid(s0),
       voiceOutputs: [
-        { instrument: "percussion", output: "x", confidence: 1.5 },
+        { instrument: "percussion", output: "x", confidence: 1.5, producedBy: "maestro-assessor" },
       ],
       verdict: {
         outcome: "applied",
@@ -384,10 +378,9 @@ describe("perform-beat shape validation", () => {
 
   test("shouldTerminate=true on failed verdict completes Performance with outcome=failed", () => {
     const s0 = reachPerform();
-    const s1 = advance(s0, {
-      kind: "perform-beat",
+    const s1 = advance(s0, { kind: "perform-beat", pauseId: pid(s0),
       voiceOutputs: [
-        { instrument: "percussion", output: "couldnt", confidence: 0.2 },
+        { instrument: "percussion", output: "couldnt", confidence: 0.2, producedBy: "maestro-assessor" },
       ],
       verdict: {
         outcome: "failed",
@@ -414,7 +407,7 @@ describe("EngineState JSON round-trip", () => {
     const roundTripped = JSON.parse(JSON.stringify(s0)) as typeof s0;
     expect(roundTripped.kind).toBe("running");
     // Advance the round-tripped state.
-    const s1 = advance(roundTripped, { kind: "confirm-fit", ok: true });
+    const s1 = advance(roundTripped, { kind: "confirm-fit", pauseId: pid(roundTripped), ok: true });
     expectPause(s1, "elicit-context");
   });
 
@@ -423,15 +416,14 @@ describe("EngineState JSON round-trip", () => {
       prompt: "understand the codebase",
       patterns: allPatterns,
     });
-    state = advance(state, { kind: "confirm-fit", ok: true });
-    state = advance(state, { kind: "go-gate", phrase: "go" });
+    state = advance(state, { kind: "confirm-fit", pauseId: pid(state), ok: true });
+    state = advance(state, { kind: "go-gate", pauseId: pid(state), phrase: "go" });
     // mid-run round-trip
     state = JSON.parse(JSON.stringify(state)) as typeof state;
     expectPause(state, "perform-beat");
-    state = advance(state, {
-      kind: "perform-beat",
+    state = advance(state, { kind: "perform-beat", pauseId: pid(state),
       voiceOutputs: [
-        { instrument: "percussion", output: "ok", confidence: 0.9 },
+        { instrument: "percussion", output: "ok", confidence: 0.9, producedBy: "maestro-assessor" },
       ],
       verdict: {
         outcome: "applied",
@@ -476,9 +468,175 @@ describe("debateComplexityHint", () => {
     for (let i = 0; i < 6; i++) {
       const pause = expectPause(state, "draft-pattern-round");
       seen.push(pause.payload.debateComplexity);
-      state = advance(state, { kind: "draft-pattern-round", outcome: "edit" });
+      state = advance(state, { kind: "draft-pattern-round", pauseId: pid(state), outcome: "edit" });
     }
     expect(seen).toEqual([1, 2, 3, 4, 4, 4]);
+  });
+});
+
+// ── pauseId idempotency guard ──────────────────────────────────────
+
+describe("pauseId idempotency", () => {
+  test("missing pauseId on resolution fails the engine", () => {
+    const s0 = createEngine({
+      prompt: "rename loadScore to loadExecutableScore",
+      patterns: allPatterns,
+    });
+    // Cast around the type system to simulate a hand-rolled JSON resolution
+    // that forgot to echo pauseId.
+    const s1 = advance(s0, { kind: "confirm-fit", ok: true } as unknown as Resolution);
+    expect(s1.kind).toBe("failed");
+    if (s1.kind === "failed") expect(s1.error).toMatch(/pauseId is required/);
+  });
+
+  test("stale pauseId (already-advanced state) fails the engine", () => {
+    const s0 = createEngine({
+      prompt: "rename loadScore to loadExecutableScore",
+      patterns: allPatterns,
+    });
+    const stalePauseId = pid(s0);
+    // First advance consumes the pauseId.
+    const s1 = advance(s0, {
+      kind: "confirm-fit",
+      pauseId: stalePauseId,
+      ok: true,
+    });
+    expectPause(s1, "elicit-context");
+    // Re-submitting the same s0+resolution against s1 (different pauseId) must fail.
+    const s2 = advance(s1, {
+      kind: "elicit-context",
+      pauseId: stalePauseId, // wrong; should be pid(s1)
+      values: { target: "x", invariant: "y" },
+    });
+    expect(s2.kind).toBe("failed");
+    if (s2.kind === "failed") expect(s2.error).toMatch(/pauseId mismatch/);
+  });
+
+  test("each pause has a fresh pauseId", () => {
+    const s0 = createEngine({
+      prompt: "rename loadScore to loadExecutableScore",
+      patterns: allPatterns,
+    });
+    const id0 = pid(s0);
+    const s1 = advance(s0, { kind: "confirm-fit", pauseId: id0, ok: true });
+    const id1 = pid(s1);
+    expect(id0).not.toBe(id1);
+    expect(typeof id1).toBe("string");
+    expect(id1.length).toBeGreaterThan(0);
+  });
+
+  test("re-emitted pause (rejected go phrase) gets a new pauseId", () => {
+    const s0 = createEngine({
+      prompt: "rename loadScore to loadExecutableScore",
+      patterns: allPatterns,
+    });
+    const s1 = advance(s0, { kind: "confirm-fit", pauseId: pid(s0), ok: true });
+    const s2 = advance(s1, {
+      kind: "elicit-context",
+      pauseId: pid(s1),
+      values: { target: "x", invariant: "y" },
+    });
+    expectPause(s2, "go-gate");
+    const goId = pid(s2);
+    // Vague phrase re-emits go-gate with a fresh pauseId.
+    const s3 = advance(s2, { kind: "go-gate", pauseId: goId, phrase: "fine" });
+    expectPause(s3, "go-gate");
+    expect(pid(s3)).not.toBe(goId);
+  });
+
+  test("pauseIdFactory injection produces deterministic ids", () => {
+    let counter = 0;
+    const factory = () => `pid-${++counter}`;
+    const s0 = createEngine({
+      prompt: "rename loadScore to loadExecutableScore",
+      patterns: allPatterns,
+      pauseIdFactory: factory,
+    });
+    expect(pid(s0)).toBe("pid-1");
+    const s1 = advance(
+      s0,
+      { kind: "confirm-fit", pauseId: "pid-1", ok: true },
+      { pauseIdFactory: factory },
+    );
+    expect(pid(s1)).toBe("pid-2");
+  });
+});
+
+// ── producedBy required on voice outputs ───────────────────────────
+
+describe("voiceOutputs.producedBy validation", () => {
+  function reachPerform(): ReturnType<typeof createEngine> {
+    const s0 = createEngine({
+      prompt: "understand the architecture",
+      patterns: allPatterns,
+    });
+    const s1 = advance(s0, { kind: "confirm-fit", pauseId: pid(s0), ok: true });
+    return advance(s1, { kind: "go-gate", pauseId: pid(s1), phrase: "go" });
+  }
+
+  test("missing producedBy fails the engine", () => {
+    const s0 = reachPerform();
+    const s1 = advance(s0, {
+      kind: "perform-beat",
+      pauseId: pid(s0),
+      // @ts-expect-error intentional missing producedBy
+      voiceOutputs: [{ instrument: "percussion", output: "x", confidence: 0.9 }],
+      verdict: {
+        outcome: "applied",
+        confidence: 0.9,
+        reason: "ok",
+        shouldTerminate: false,
+      },
+    });
+    expect(s1.kind).toBe("failed");
+    if (s1.kind === "failed") expect(s1.error).toMatch(/producedBy/);
+  });
+
+  test("invalid producedBy value fails the engine", () => {
+    const s0 = reachPerform();
+    const s1 = advance(s0, {
+      kind: "perform-beat",
+      pauseId: pid(s0),
+      voiceOutputs: [
+        // @ts-expect-error intentional bad enum value
+        { instrument: "percussion", output: "x", confidence: 0.9, producedBy: "Composer" },
+      ],
+      verdict: {
+        outcome: "applied",
+        confidence: 0.9,
+        reason: "ok",
+        shouldTerminate: false,
+      },
+    });
+    expect(s1.kind).toBe("failed");
+    if (s1.kind === "failed") expect(s1.error).toMatch(/producedBy/);
+  });
+
+  test("producedBy persists onto PerformedVoice", () => {
+    const s0 = reachPerform();
+    const s1 = advance(s0, {
+      kind: "perform-beat",
+      pauseId: pid(s0),
+      voiceOutputs: [
+        {
+          instrument: "percussion",
+          output: "ok",
+          confidence: 0.9,
+          producedBy: "maestro-executor",
+        },
+      ],
+      verdict: {
+        outcome: "applied",
+        confidence: 0.9,
+        reason: "ok",
+        shouldTerminate: false,
+      },
+    });
+    expectPause(s1, "perform-beat");
+    if (s1.kind === "running") {
+      const recorded = s1.internal.performedBeats[0].voices[0];
+      expect(recorded.producedBy).toBe("maestro-executor");
+    }
   });
 });
 
@@ -491,10 +649,9 @@ describe("resolution kind mismatch", () => {
       patterns: allPatterns,
     });
     // s0 is paused on confirm-fit but we submit a perform-beat resolution.
-    const s1 = advance(s0, {
-      kind: "perform-beat",
+    const s1 = advance(s0, { kind: "perform-beat", pauseId: pid(s0),
       voiceOutputs: [
-        { instrument: "percussion", output: "x", confidence: 0.9 },
+        { instrument: "percussion", output: "x", confidence: 0.9, producedBy: "maestro-assessor" },
       ],
       verdict: {
         outcome: "applied",
@@ -521,19 +678,19 @@ describe("full run integration", () => {
       prompt: "understand the codebase",
       patterns: allPatterns,
     });
-    state = advance(state, { kind: "confirm-fit", ok: true });
-    state = advance(state, { kind: "go-gate", phrase: "go" });
+    state = advance(state, { kind: "confirm-fit", pauseId: pid(state), ok: true });
+    state = advance(state, { kind: "go-gate", pauseId: pid(state), phrase: "go" });
 
     for (let i = 0; i < beats; i++) {
       const pause = expectPause(state, "perform-beat");
       expect(pause.payload.beatIndex).toBe(i);
-      state = advance(state, {
-        kind: "perform-beat",
+      state = advance(state, { kind: "perform-beat", pauseId: pid(state),
         voiceOutputs: [
           {
             instrument: pause.payload.beat.voices[0].instrument,
             output: `output for beat ${i}`,
             confidence: 0.85,
+            producedBy: "maestro-assessor",
           },
         ],
         verdict: {

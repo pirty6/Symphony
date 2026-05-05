@@ -12,8 +12,6 @@ import type { Pattern, PatternScore } from "./types";
 const score: PatternScore = {
   pattern: "refactor",
   domain: "refactor",
-  defaultComplexity: 3,
-  defaultShape: "localized",
   beats: [
     {
       step: "name",

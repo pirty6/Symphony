@@ -156,7 +156,7 @@ function runFromPattern(args: CliArgs): number {
   }
   writeJson(args.out!, score);
   process.stdout.write(
-    `OK compiled (${pattern.score.pattern}):\n  scoreId        = ${score.id}\n  beats          = ${score.beats.length}\n  dominantLevels = [${score.frequencyMap.dominantLevels.join(", ")}]\n  out            = ${args.out}\n`,
+    `OK compiled (${pattern.score.pattern}):\n  scoreId        = ${score.id}\n  beats          = ${score.beats.length}\n  activeLevels   = [${score.frequencyMap.activeLevels.join(", ")}]\n  out            = ${args.out}\n`,
   );
   return 0;
 }
@@ -179,7 +179,7 @@ function runParse(args: CliArgs): number {
   }
   writeJson(args.out!, score);
   process.stdout.write(
-    `OK parsed:\n  scoreId        = ${score.id}\n  beats          = ${score.beats.length}\n  dominantLevels = [${score.frequencyMap.dominantLevels.join(", ")}]\n  out            = ${args.out}\n`,
+    `OK parsed:\n  scoreId        = ${score.id}\n  beats          = ${score.beats.length}\n  activeLevels   = [${score.frequencyMap.activeLevels.join(", ")}]\n  out            = ${args.out}\n`,
   );
   return 0;
 }
@@ -322,8 +322,6 @@ function runListPatterns(args: CliArgs): number {
     const out = patterns.map((p) => ({
       pattern: p.score.pattern,
       domain: p.score.domain,
-      defaultComplexity: p.score.defaultComplexity,
-      defaultShape: p.score.defaultShape,
       verbTriggers: p.verbTriggers,
       requiredContext: p.requiredContext,
       beats: p.score.beats.length,
@@ -336,7 +334,7 @@ function runListPatterns(args: CliArgs): number {
     const reqd =
       p.requiredContext.length > 0 ? p.requiredContext.join(",") : "\u2014";
     process.stdout.write(
-      `  ${p.score.pattern.padEnd(14)} domain=${p.score.domain.padEnd(16)} complexity=${p.score.defaultComplexity}  shape=${p.score.defaultShape.padEnd(14)} requiredContext=${reqd}\n`,
+      `  ${p.score.pattern.padEnd(14)} domain=${p.score.domain.padEnd(16)} requiredContext=${reqd}\n`,
     );
     process.stdout.write(
       `    verbs: ${p.verbTriggers.map((v) => (v.includes(" ") ? `"${v}"` : v)).join(", ")}\n`,

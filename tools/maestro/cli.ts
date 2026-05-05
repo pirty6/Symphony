@@ -87,6 +87,7 @@ function emitPauseAndExit(state: EngineState): never {
       {
         status: "pause",
         kind: pause.kind,
+        pauseId: pause.pauseId,
         payload: pause.payload,
         composerPrompt: composerPromptFor(pause),
         instrumentPrompt: instrumentPromptFor(pause),

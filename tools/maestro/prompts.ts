@@ -9,7 +9,7 @@
 
 import type { Pattern } from "../patterns/types";
 import type { Beat } from "../symphony/types";
-import { MAESTRO_DRAFT_MAX_ROUNDS, MAESTRO_GO_PHRASES, type DebateComplexity, type Pause, type PatternSummary } from "./engine";
+import { MAESTRO_DRAFT_MAX_ROUNDS, MAESTRO_GO_PHRASES, type Complexity, type Pause, type PatternSummary } from "./engine";
 
 // ── Per-pause builders ─────────────────────────────────────────────
 
@@ -96,7 +96,7 @@ function confirmInstrument(pattern: string): string {
 
 function draftComposer(
   round: number,
-  complexity: DebateComplexity,
+  complexity: Complexity,
   priorDraft: Pattern | null,
 ): string {
   const agents = [
@@ -124,7 +124,7 @@ function draftComposer(
   ].join("\n");
 }
 
-function draftInstrument(round: number, complexity: DebateComplexity): string {
+function draftInstrument(round: number, complexity: Complexity): string {
   return `Round ${round}, complexity ${complexity}. Run the debate, return a draft Pattern.`;
 }
 

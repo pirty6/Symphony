@@ -62,7 +62,6 @@ export function computeExecutableScoreId(
   const base: Record<string, unknown> = {
     schemaVersion: score.schemaVersion,
     frequencyMap: score.frequencyMap,
-    tempo: score.tempo,
     beats: score.beats,
     generatedFrom: score.generatedFrom,
   };

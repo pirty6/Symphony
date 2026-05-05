@@ -36,9 +36,24 @@ npx tsx tools/maestro/cli.ts resolve \
 Loop `resolve` until you see exit 0 (final `Performance` on stdout) or
 exit 1 (engine rejected something — read stderr, do not retry blindly).
 
-Each Pause carries `{ kind, payload, composerPrompt, instrumentPrompt }`.
+Each Pause carries `{ kind, pauseId, payload, composerPrompt, instrumentPrompt }`.
 The `composerPrompt` is the question the engine is asking you. The Pause
 `kind` tells you exactly which Resolution shape to send back.
+
+### `pauseId` is mandatory on every Resolution
+
+The engine assigns a fresh uuid to every Pause. Your Resolution must
+echo that exact `pauseId`. The engine rejects:
+
+- a Resolution missing `pauseId` (engine fails with `pauseId is required`)
+- a Resolution whose `pauseId` does not match the current Pause (engine
+  fails with `pauseId mismatch`)
+
+This makes replays impossible. If you re-run `cli.ts resolve` against
+an already-advanced state file, the stale `pauseId` will be rejected
+rather than silently advancing the run a second time. Always read the
+current state file's pause and copy its `pauseId` into the resolution
+you're about to send.
 
 ---
 
@@ -49,7 +64,7 @@ The prompt matched multiple patterns' `verbTriggers` (or zero, after a
 rejected confirm-fit). You see `payload.candidates`. Pick one that
 matches the user's intent, or `"no-match"` to enter draft-pattern.
 
-> Resolution: `{ "kind": "match-pattern", "chosen": "<pattern>" | "no-match" }`
+> Resolution: `{ "kind": "match-pattern", "pauseId": "<echo>", "chosen": "<pattern>" | "no-match" }`
 
 ### `confirm-fit`
 The engine identified a single likely pattern and is asking you to
@@ -64,8 +79,8 @@ pattern (it does not silently skip; you re-confirm with the user).
 If the user objects but doesn't name a target, send `ok=false` alone —
 the engine re-emits `match-pattern` with every registered pattern.
 
-> Resolution: `{ "kind": "confirm-fit", "ok": true }`
-> or `{ "kind": "confirm-fit", "ok": false, "reroute": "<pattern>" }`
+> Resolution: `{ "kind": "confirm-fit", "pauseId": "<echo>", "ok": true }`
+> or `{ "kind": "confirm-fit", "pauseId": "<echo>", "ok": false, "reroute": "<pattern>" }`
 
 ### `draft-pattern-round`
 No pattern matched, or you sent `"no-match"`. The engine is asking for
@@ -91,7 +106,7 @@ response:
 - ambiguous response → `outcome="ambiguous"` (re-shows same draft next
   round; use sparingly — if you can ask one targeted question instead, do)
 
-> Resolution: `{ "kind": "draft-pattern-round", "outcome": "approve" | "edit" | "ambiguous", "nextDraft": <Pattern>? }`
+> Resolution: `{ "kind": "draft-pattern-round", "pauseId": "<echo>", "outcome": "approve" | "edit" | "ambiguous", "nextDraft": <Pattern>? }`
 
 Show the draft in plain language: lead with the code, then short
 paragraphs for *how I got here*, *what we argued about*, *what I'm not
@@ -110,7 +125,7 @@ filled. For each missing key:
 The engine re-emits `elicit-context` until every required key is a
 non-empty string. Whitespace-only values do not advance.
 
-> Resolution: `{ "kind": "elicit-context", "values": { "<key>": "<value>", ... } }`
+> Resolution: `{ "kind": "elicit-context", "pauseId": "<echo>", "values": { "<key>": "<value>", ... } }`
 
 ### `go-gate`
 All required context is filled. Show the user a one-block summary and
@@ -122,7 +137,7 @@ Anything else — including *"sounds fine-ish"*, *"yeah"*, *"sure"* —
 re-emits `go-gate`. Do not relay vague language as a go phrase; ask the
 user to commit explicitly.
 
-> Resolution: `{ "kind": "go-gate", "phrase": "go" }`
+> Resolution: `{ "kind": "go-gate", "pauseId": "<echo>", "phrase": "go" }`
 
 ### `perform-beat`
 The score is compiled and the engine is walking beats in order.
@@ -137,7 +152,16 @@ The score is compiled and the engine is walking beats in order.
 - One `voiceOutputs[]` entry per beat voice. The engine validates
   shape strictly: array length must match `beat.voices.length`,
   `instrument` must be a non-empty string, `output` a string,
-  `confidence` a number in [0,1]. Mismatches fail the run.
+  `confidence` a number in [0,1], and `producedBy` must be either
+  `"maestro-assessor"` (read-only beats) or `"maestro-executor"`
+  (mutating beats). Mismatches fail the run.
+- The `producedBy` field is a wire-level commitment that you spawned
+  the named sub-agent for this beat. The engine cannot verify that you
+  actually delegated — it only checks the field is present and one of
+  the two legal values. Lying about `producedBy` is a protocol
+  violation; the rule is: if the value says `maestro-assessor`, the
+  output text must come from a `maestro-assessor` sub-agent, not from
+  your own synthesis.
 - Provide a `MoveVerdict`: `outcome` ∈ `applied | failed | skipped`,
   `confidence` ∈ [0,1], `reason` (one sentence), `shouldTerminate`
   (set true to stop early on a critical failure).
@@ -145,7 +169,8 @@ The score is compiled and the engine is walking beats in order.
 > Resolution:
 > ```json
 > { "kind": "perform-beat",
->   "voiceOutputs": [{ "instrument": "...", "output": "...", "confidence": 0.9 }],
+>   "pauseId": "<echo>",
+>   "voiceOutputs": [{ "instrument": "...", "output": "...", "confidence": 0.9, "producedBy": "maestro-assessor" }],
 >   "verdict": { "outcome": "applied", "confidence": 0.9, "reason": "...", "shouldTerminate": false }
 > }
 > ```
@@ -181,6 +206,10 @@ These cannot be violated, even by accident:
   `performedBeats` instead of `beats`, etc.) is impossible.
 - **State is JSON-round-trippable** — you can pause, persist, and
   resume across turns by simply re-reading the state file.
+- **Replay is detectable** — every Pause has a fresh `pauseId`; every
+  Resolution must echo it. Re-running a stale resolution against an
+  advanced state fails on `pauseId mismatch` rather than silently
+  advancing the run twice.
 
 You should not re-implement any of these checks in prose; the engine
 will reject violations with a clear message on stderr.
@@ -235,6 +264,19 @@ via the engine.
 - **Hand-writing the `Performance`.** Always submit voice outputs through
   the engine's `perform-beat` Resolution; never assemble a
   `Performance` JSON yourself. The engine builds it for you.
+- **Writing voice outputs without spawning a sub-agent.** A
+  `perform-beat` voice output marked `producedBy: "maestro-assessor"`
+  must be the literal output of a spawned `maestro-assessor`; same for
+  `"maestro-executor"`. The Composer does not produce voice outputs
+  itself. The engine cannot detect a lie here — the discipline is
+  yours to keep.
+- **Re-running `resolve` on the same state file.** If a `resolve`
+  command appears to hang or you're unsure whether it succeeded, do
+  *not* re-issue it. Read the state file: if `pause.pauseId` changed,
+  the previous call advanced; if not, it didn't. Re-issuing with the
+  prior `pauseId` will fail loudly, but re-issuing with a freshly
+  copied one would silently double-advance. Always derive `pauseId`
+  from the current on-disk state.
 
 ---
 

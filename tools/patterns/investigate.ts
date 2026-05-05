@@ -14,8 +14,6 @@ import type { Pattern, PatternScore } from "./types";
 const score: PatternScore = {
   pattern: "investigate",
   domain: "investigate",
-  defaultComplexity: 4,
-  defaultShape: "layered",
   beats: [
     {
       step: "clarify-restate",
