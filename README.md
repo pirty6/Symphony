@@ -2,6 +2,14 @@
 
 A pattern for building deterministic, auditable AI agent workflows using state machines, structured prompt hand-offs, and strict role separation.
 
+> **Three names, one product.** The repo is **Symphony** (the pattern).
+> **Maestro** is the agent that runs it ([.github/agents/maestro*.agent.md](.github/agents)).
+> **meta-score** is the legacy 8-phase prompt-loop CLI that predates maestro
+> and is kept as a fallback ([tools/meta-score/](tools/meta-score), [bin/meta-score](bin/meta-score)).
+> The runtime types maestro produces and consumes (`Score`, `Beat`,
+> `Performance`) live in [tools/symphony/](tools/symphony) — same name as the
+> repo, narrower scope.
+
 ---
 
 ## Core Idea

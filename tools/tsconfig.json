@@ -3,9 +3,6 @@
   "compilerOptions": {
     "module": "node16",
     "moduleResolution": "node16",
-    "outDir": "./lib",
-    "declaration": true,
-    "declarationDir": "./lib/types",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "allowJs": true,
@@ -14,5 +11,5 @@
     "types": ["jest", "node"]
   },
   "include": ["."],
-  "exclude": ["just.config.cjs", "lib"]
+  "exclude": ["lib"]
 }
