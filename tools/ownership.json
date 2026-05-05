@@ -1,7 +1,0 @@
-{
-  "$schema": "../../common/schemas/ownership.schema.json",
-  "owners": ["arcadiog@microsoft.com"],
-  "areaPath": "OC\\FluidX\\LoopApp\\Foundations",
-  "adoTenant": "office",
-  "distributionEmail": "ffxrepo@microsoft.com"
-}
