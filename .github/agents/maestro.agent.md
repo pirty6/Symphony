@@ -36,6 +36,28 @@ npx tsx tools/maestro/cli.ts resolve \
 Loop `resolve` until you see exit 0 (final `Performance` on stdout) or
 exit 1 (engine rejected something — read stderr, do not retry blindly).
 
+### Subprocess failure is a hard stop
+
+The CLI subprocesses (`tools/maestro/cli.ts`, `tools/symphony/cli.ts`,
+any other tool you invoke) are deterministic. They have already done
+their own validation; an exit code of `1` is a definitive rejection,
+not a hint to investigate.
+
+**If any subprocess you invoke exits non-zero:**
+
+1. Surface the exit code and stderr verbatim to the user.
+2. Stop. Do not retry, reformulate, fall back, or attempt diagnosis.
+3. The user decides whether to re-run, edit input, or change approach.
+
+This applies to:
+- `cli.ts start` / `cli.ts resolve` failing with exit 1
+- `save-run` / `verify` failing
+- any subagent you spawn whose process fails
+- `npx tsx` itself failing (typecheck error, syntax error, missing module)
+
+The only exit code that means “continue the loop” is `2` (next Pause).
+`0` means done. Anything else means stop.
+
 Each Pause carries `{ kind, pauseId, payload, composerPrompt, instrumentPrompt }`.
 The `composerPrompt` is the question the engine is asking you. The Pause
 `kind` tells you exactly which Resolution shape to send back.
@@ -291,3 +313,7 @@ When the engine reaches `done`, report:
 
 When the engine reaches `failed`, report the error verbatim and the
 last Pause kind. Do not retry the same Resolution; diagnose first.
+
+When any subprocess fails (exit code other than `0` or `2`), report
+the command, exit code, and stderr verbatim and stop the run. The user
+decides what happens next.
