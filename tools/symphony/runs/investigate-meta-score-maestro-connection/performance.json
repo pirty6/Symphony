@@ -1,0 +1,161 @@
+{
+  "scoreId": "ad38fc7b3092214c2f746d5801b25f2321b95227afe9375d1e4514cd361a2fd7",
+  "beats": [
+    {
+      "beatIndex": 0,
+      "voices": [
+        {
+          "instrument": "piano",
+          "output": "Decomposed into Q0 (does maestro need reproducibility?), Q1 (connection), Q2 (removals), Q3 (per-field utility for 9 fields). Multi-part prompt; restate-mode would have lost 9 of 9 items.",
+          "confidence": 0.95
+        }
+      ],
+      "verdict": {
+        "outcome": "applied",
+        "confidence": 0.95,
+        "shouldTerminate": false,
+        "reason": "9 sub-questions extracted; Q0 surfaced as upstream gate"
+      },
+      "stateHash": "83a341a33f086c771205e1979abb56e73ff27a4a9a423ff9fb8dc33ad79dabd9"
+    },
+    {
+      "beatIndex": 1,
+      "voices": [
+        {
+          "instrument": "percussion",
+          "output": "Scope verified by grep: maestro agent files reference meta-score only via CLI invocation (Phase 3.2) and composer description; ZERO symbol imports. Coupling is one-way subprocess.",
+          "confidence": 0.98
+        }
+      ],
+      "verdict": {
+        "outcome": "applied",
+        "confidence": 0.98,
+        "shouldTerminate": false,
+        "reason": "Coupling is CLI-subprocess only, no shared symbols"
+      },
+      "stateHash": "83a341a33f086c771205e1979abb56e73ff27a4a9a423ff9fb8dc33ad79dabd9"
+    },
+    {
+      "beatIndex": 2,
+      "voices": [
+        {
+          "instrument": "strings",
+          "output": "Per field: tempo/beats/frequencyMap/schemaVersion/fingerprintProblem/generatedFrom/computeScoreId all defined in tools/symphony/{types,persistence}.ts; consumed by parse.ts and persistence; NOT consumed by meta-score or any agent file. level/instrument additionally referenced in agent files (proposer.agent.md, maestro.agent.md) and algorithm templates (feature.md, investigate.md) as the annotation-table convention.",
+          "confidence": 0.97
+        }
+      ],
+      "verdict": {
+        "outcome": "applied",
+        "confidence": 0.97,
+        "shouldTerminate": false,
+        "reason": "level/instrument are the only fields with agent-file consumers"
+      },
+      "stateHash": "83a341a33f086c771205e1979abb56e73ff27a4a9a423ff9fb8dc33ad79dabd9"
+    },
+    {
+      "beatIndex": 3,
+      "voices": [
+        {
+          "instrument": "strings",
+          "output": "Read: types.ts (Score/Beat/Voice/FrequencyMap), persistence.ts (computeScoreId+fingerprintProblem+loadScore), parse.ts, prompts.ts (no symphony field references), maestro.agent.md (Phase 3.2 = CLI invocation only). No hidden indirect uses.",
+          "confidence": 0.93
+        }
+      ],
+      "verdict": {
+        "outcome": "applied",
+        "confidence": 0.93,
+        "shouldTerminate": false,
+        "reason": "Meta-score prompt corpus has zero symphony-field references"
+      },
+      "stateHash": "83a341a33f086c771205e1979abb56e73ff27a4a9a423ff9fb8dc33ad79dabd9"
+    },
+    {
+      "beatIndex": 4,
+      "voices": [
+        {
+          "instrument": "strings",
+          "output": "Map: tempo/frequencyMap/schemaVersion/fingerprintProblem/generatedFrom/computeScoreId have consumer={none beyond persistence}. beats/level/instrument have consumer={parse, future executor, agent annotation tables}. Provenance cluster consumed only by computeScoreId/loadScore validation — dormant.",
+          "confidence": 0.96
+        }
+      ],
+      "verdict": {
+        "outcome": "applied",
+        "confidence": 0.96,
+        "shouldTerminate": false,
+        "reason": "Provenance cluster is dormant infrastructure"
+      },
+      "stateHash": "83a341a33f086c771205e1979abb56e73ff27a4a9a423ff9fb8dc33ad79dabd9"
+    },
+    {
+      "beatIndex": 5,
+      "voices": [
+        {
+          "instrument": "woodwinds",
+          "output": "Joint claim 'any provenance field has a live consumer under maestro' tested: FALSE. Cluster value is conditional on whether maestro wants replay/audit. Surfacing as Q0.",
+          "confidence": 0.85
+        }
+      ],
+      "verdict": {
+        "outcome": "applied",
+        "confidence": 0.85,
+        "shouldTerminate": false,
+        "reason": "Provenance value is gated on reproducibility decision (Q0)"
+      },
+      "stateHash": "83a341a33f086c771205e1979abb56e73ff27a4a9a423ff9fb8dc33ad79dabd9"
+    },
+    {
+      "beatIndex": 6,
+      "voices": [
+        {
+          "instrument": "brass",
+          "output": "Verdicts: level=keep-rewire, instrument=keep-rewire, beats=keep-rewire, tempo=keep-default, frequencyMap=keep-derived, provenance-cluster=keep-but-gated-on-Q0. heuristic.ts=deprecate-candidate (obsolete given derived frequencyMap).",
+          "confidence": 0.92
+        }
+      ],
+      "verdict": {
+        "outcome": "applied",
+        "confidence": 0.92,
+        "shouldTerminate": false,
+        "reason": "9 fields classified; one cluster joint verdict; one deprecate-candidate"
+      },
+      "stateHash": "83a341a33f086c771205e1979abb56e73ff27a4a9a423ff9fb8dc33ad79dabd9"
+    },
+    {
+      "beatIndex": 7,
+      "voices": [
+        {
+          "instrument": "piano",
+          "output": "Q1: three connection points (CLI/parse/executor); CLI is weakest, parseAlgorithm is the new joint, executor is missing. Q2: meta-score phases 1-5 redundant from maestro; --knowledge-context channel should be replaced with --score path; heuristic.ts deprecate-candidate. Q3: level/instrument/beats live, tempo/frequencyMap/schemaVersion useful schema, provenance gated. Q0: open, routed to decide template.",
+          "confidence": 0.94
+        }
+      ],
+      "verdict": {
+        "outcome": "applied",
+        "confidence": 0.94,
+        "shouldTerminate": false,
+        "reason": "All sub-questions answered; Q0 marked open"
+      },
+      "stateHash": "83a341a33f086c771205e1979abb56e73ff27a4a9a423ff9fb8dc33ad79dabd9"
+    },
+    {
+      "beatIndex": 8,
+      "voices": [
+        {
+          "instrument": "percussion",
+          "output": "Follow-ups: (1) decide Q0 [decide], (2) build Score executor [feature], (3) replace --knowledge-context with --score [refactor], (4) strip meta-score phases 1-5 or gate them [refactor], (5) update maestro.agent.md Phase 3.2 to call parseAlgorithm not CLI [refactor], (6) deprecate heuristic.ts after Q0 [refactor].",
+          "confidence": 0.93
+        }
+      ],
+      "verdict": {
+        "outcome": "applied",
+        "confidence": 0.93,
+        "shouldTerminate": false,
+        "reason": "6 follow-ups tagged; #2 unblocks #3-#5"
+      },
+      "stateHash": "83a341a33f086c771205e1979abb56e73ff27a4a9a423ff9fb8dc33ad79dabd9"
+    }
+  ],
+  "startedAt": "2026-05-04T00:00:00.000Z",
+  "completedAt": "2026-05-04T00:00:00.000Z",
+  "outcome": "partial"
+}
