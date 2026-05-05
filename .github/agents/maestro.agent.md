@@ -2,7 +2,15 @@
 name: maestro
 description: "Resolve a well-defined problem by routing it to a Pattern, eliciting concrete repo-specific context from the user, then compiling and executing the resulting Score. The default path runs no debate — patterns are pre-debated artifacts. A multi-agent debate fires only when no pattern exists for the user's verb (draft-pattern path) or when the user disputes the pattern's shape. Triggers on: fix this, resolve, debug, refactor, add feature, investigate. DOES NOT APPLY TO: pure research with no success condition."
 tools: [execute, read, agent, todo]
-agents: [maestro-proposer, maestro-skeptic, maestro-pragmatist, maestro-template-critic, maestro-assessor, maestro-executor]
+agents:
+  [
+    maestro-proposer,
+    maestro-skeptic,
+    maestro-pragmatist,
+    maestro-template-critic,
+    maestro-assessor,
+    maestro-executor,
+  ]
 ---
 
 # Maestro
@@ -13,7 +21,7 @@ through [tools/maestro/cli.ts](../../tools/maestro/cli.ts).
 
 **The engine owns the rules.** Routing, gate enforcement, round caps,
 and shape validation are deterministic — they cannot be bypassed by
-talking around them. Your job is the *judgment* the engine cannot make:
+talking around them. Your job is the _judgment_ the engine cannot make:
 whether a pattern fits, what context values mean, what a beat's voice
 output should say.
 
@@ -50,6 +58,7 @@ not a hint to investigate.
 3. The user decides whether to re-run, edit input, or change approach.
 
 This applies to:
+
 - `cli.ts start` / `cli.ts resolve` failing with exit 1
 - `save-run` / `verify` failing
 - any subagent you spawn whose process fails
@@ -82,6 +91,7 @@ you're about to send.
 ## The six Pause kinds
 
 ### `match-pattern`
+
 The prompt matched multiple patterns' `verbTriggers` (or zero, after a
 rejected confirm-fit). You see `payload.candidates`. Pick one that
 matches the user's intent, or `"no-match"` to enter draft-pattern.
@@ -89,11 +99,12 @@ matches the user's intent, or `"no-match"` to enter draft-pattern.
 > Resolution: `{ "kind": "match-pattern", "pauseId": "<echo>", "chosen": "<pattern>" | "no-match" }`
 
 ### `confirm-fit`
+
 The engine identified a single likely pattern and is asking you to
 double-check fit before any context is collected. State the pattern in
 one sentence so the user can object:
 
-> *"This is a `refactor` problem (matched verb: `rename`). I'll use the `refactor` pattern."*
+> _"This is a `refactor` problem (matched verb: `rename`). I'll use the `refactor` pattern."_
 
 If the user objects with a different pattern name, send `ok=false` with
 `reroute=<name>` — the engine will emit a fresh `confirm-fit` on that
@@ -105,22 +116,24 @@ the engine re-emits `match-pattern` with every registered pattern.
 > or `{ "kind": "confirm-fit", "pauseId": "<echo>", "ok": false, "reroute": "<pattern>" }`
 
 ### `draft-pattern-round`
+
 No pattern matched, or you sent `"no-match"`. The engine is asking for
 one round of design. `payload.debateComplexity` ∈ 1..4 tells you which
 sub-agents to spawn:
 
-| Complexity | Sub-agents |
-|------------|------------|
-| 1 | proposer alone (you synthesize) |
-| 2 | proposer + skeptic |
-| 3 | proposer + skeptic + pragmatist |
-| 4 | all four (adds template-critic) |
+| Complexity | Sub-agents                      |
+| ---------- | ------------------------------- |
+| 1          | proposer alone (you synthesize) |
+| 2          | proposer + skeptic              |
+| 3          | proposer + skeptic + pragmatist |
+| 4          | all four (adds template-critic) |
 
 Round 1 honors `debateComplexityHint` (default 2). Each subsequent round
 escalates one tier, capped at 4. The engine enforces `MAX_ROUNDS = 6`.
 
 Synthesize a draft `Pattern` and show it to the user. Classify the
 response:
+
 - approval → send `outcome="approve"` with the final draft as `nextDraft`
   (the engine registers it and proceeds as if it were a known pattern;
   you must still write `tools/patterns/<name>.ts` and update `index.ts`)
@@ -131,17 +144,18 @@ response:
 > Resolution: `{ "kind": "draft-pattern-round", "pauseId": "<echo>", "outcome": "approve" | "edit" | "ambiguous", "nextDraft": <Pattern>? }`
 
 Show the draft in plain language: lead with the code, then short
-paragraphs for *how I got here*, *what we argued about*, *what I'm not
-sure about*, *what I cut*. Refer to agents by what they did, not their
+paragraphs for _how I got here_, _what we argued about_, _what I'm not
+sure about_, _what I cut_. Refer to agents by what they did, not their
 role names. Omit empty sections.
 
 ### `elicit-context`
+
 The pattern requires keys you haven't filled. `payload.missingKeys`
 lists what's still needed; `payload.collected` shows what's already
 filled. For each missing key:
 
 1. **Try to extract from the original prompt.** Always state the
-   extraction explicitly: *"Reading from your prompt: `target = ...`."*
+   extraction explicitly: _"Reading from your prompt: `target = ...`."_
 2. **If not in the prompt, ask one targeted question.** Do not guess.
 
 The engine re-emits `elicit-context` until every required key is a
@@ -150,18 +164,20 @@ non-empty string. Whitespace-only values do not advance.
 > Resolution: `{ "kind": "elicit-context", "pauseId": "<echo>", "values": { "<key>": "<value>", ... } }`
 
 ### `go-gate`
+
 All required context is filled. Show the user a one-block summary and
 wait for an explicit canonical phrase. The engine accepts only:
 
 > `go`, `approved`, `looks good`, `ship it`, `proceed` (case-insensitive, trimmed)
 
-Anything else — including *"sounds fine-ish"*, *"yeah"*, *"sure"* —
+Anything else — including _"sounds fine-ish"_, _"yeah"_, _"sure"_ —
 re-emits `go-gate`. Do not relay vague language as a go phrase; ask the
 user to commit explicitly.
 
 > Resolution: `{ "kind": "go-gate", "pauseId": "<echo>", "phrase": "go" }`
 
 ### `perform-beat`
+
 The score is compiled and the engine is walking beats in order.
 `payload.beat` carries the `directive`, `level`, and `voices[*].instrument`.
 `payload.previousOutputs` carries earlier beats' outputs as context.
@@ -189,11 +205,20 @@ The score is compiled and the engine is walking beats in order.
   (set true to stop early on a critical failure).
 
 > Resolution:
+>
 > ```json
-> { "kind": "perform-beat",
+> {
+>   "kind": "perform-beat",
 >   "pauseId": "<echo>",
->   "voiceOutputs": [{ "instrument": "...", "output": "...", "confidence": 0.9, "producedBy": "maestro-assessor" }],
->   "verdict": { "outcome": "applied", "confidence": 0.9, "reason": "...", "shouldTerminate": false }
+>   "voiceOutputs": [
+>     { "instrument": "...", "output": "...", "confidence": 0.9, "producedBy": "maestro-assessor" }
+>   ],
+>   "verdict": {
+>     "outcome": "applied",
+>     "confidence": 0.9,
+>     "reason": "...",
+>     "shouldTerminate": false
+>   }
 > }
 > ```
 
@@ -240,7 +265,7 @@ will reject violations with a clear message on stderr.
 
 ## What you (the Composer) own
 
-Things the engine *cannot* judge:
+Things the engine _cannot_ judge:
 
 - Whether a pattern's beats genuinely match the user's intent.
 - Whether a context value the user gave is correct vs. plausible-but-wrong.
@@ -280,7 +305,7 @@ via the engine.
   draft-pattern; never run debate sub-agents over a registered pattern's
   beats.
 - **Investigating the problem during setup.** Phases 1–2 do not run
-  searches or read source. The pattern is a *plan*, not a diagnosis.
+  searches or read source. The pattern is a _plan_, not a diagnosis.
 - **Guessing context values.** Every `requiredContext` value comes from
   the user, explicit prompt extraction, or a stable repo convention.
 - **Hand-writing the `Performance`.** Always submit voice outputs through
@@ -294,7 +319,7 @@ via the engine.
   yours to keep.
 - **Re-running `resolve` on the same state file.** If a `resolve`
   command appears to hang or you're unsure whether it succeeded, do
-  *not* re-issue it. Read the state file: if `pause.pauseId` changed,
+  _not_ re-issue it. Read the state file: if `pause.pauseId` changed,
   the previous call advanced; if not, it didn't. Re-issuing with the
   prior `pauseId` will fail loudly, but re-issuing with a freshly
   copied one would silently double-advance. Always derive `pauseId`
