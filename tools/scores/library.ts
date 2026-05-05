@@ -40,11 +40,11 @@ export interface ScoreLibraryIndex {
 }
 
 function listSavedRunFiles(storeDir: string): readonly string[] {
-  if (!fs.existsSync(storeDir)) return [];
+  if (!fs.existsSync(storeDir)) {return [];}
   const out: string[] = [];
   const patternDirs = fs.readdirSync(storeDir, { withFileTypes: true });
   for (const dir of patternDirs) {
-    if (!dir.isDirectory()) continue;
+    if (!dir.isDirectory()) {continue;}
     const sub = path.join(storeDir, dir.name);
     const files = fs.readdirSync(sub, { withFileTypes: true });
     for (const f of files) {
@@ -106,7 +106,7 @@ export function writeLibraryIndex(
 export function loadLibraryIndex(
   indexFile: string = INDEX_FILE,
 ): ScoreLibraryIndex {
-  if (!fs.existsSync(indexFile)) return buildLibraryIndex();
+  if (!fs.existsSync(indexFile)) {return buildLibraryIndex();}
   const raw = fs.readFileSync(indexFile, "utf8");
   return JSON.parse(raw) as ScoreLibraryIndex;
 }

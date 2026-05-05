@@ -27,12 +27,9 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { listPatterns } from "../patterns";
-import {
-  advance,
-  createEngine,
-  type EngineState,
-  type Resolution,
-} from "./engine";
+import { advance, createEngine } from "./engine";
+import type { EngineState } from "./types/engine";
+import type { Resolution } from "./types/resolution";
 import { composerPromptFor, instrumentPromptFor } from "./prompts";
 
 interface CliArgs {
@@ -46,14 +43,15 @@ function parseArgs(argv: readonly string[]): CliArgs {
   const args = argv.slice(2);
   const command = args[0] ?? "";
   const out: Record<string, string> = {};
-  for (let i = 1; i < args.length; i++) {
+  for (let i = 1; i < args.length; i += 1) {
     const a = args[i];
-    if (!a.startsWith("--")) continue;
+    if (!a.startsWith("--")) {continue;}
     const eq = a.indexOf("=");
     if (eq !== -1) {
       out[a.substring(2, eq)] = a.substring(eq + 1);
     } else if (i + 1 < args.length && !args[i + 1].startsWith("--")) {
-      out[a.substring(2)] = args[++i];
+      i += 1;
+      out[a.substring(2)] = args[i];
     }
   }
   return {
@@ -129,39 +127,39 @@ function readState(file: string): EngineState {
 }
 
 function runStart(args: CliArgs): never {
-  if (!args.prompt || !args.state) usage();
+  const { prompt, state: stateFile } = args;
+  if (!prompt || !stateFile) {usage();}
   const state = createEngine({
-    prompt: args.prompt!,
+    prompt,
     patterns: listPatterns(),
   });
   if (state.kind === "failed") {
     process.stderr.write(`ENGINE ERROR: ${state.error}\n`);
     process.exit(1);
   }
-  writeState(args.state!, state);
-  if (state.kind === "running") emitPauseAndExit(state);
+  writeState(stateFile, state);
+  if (state.kind === "running") {emitPauseAndExit(state);}
   emitDoneAndExit(state);
 }
 
 function runResolve(args: CliArgs): never {
-  if (!args.state || !args.resolution) usage();
+  const { state: stateFile, resolution: resolutionRaw } = args;
+  if (!stateFile || !resolutionRaw) {usage();}
   let resolution: Resolution;
   try {
-    resolution = JSON.parse(args.resolution!) as Resolution;
+    resolution = JSON.parse(resolutionRaw) as Resolution;
   } catch (e) {
-    process.stderr.write(
-      `RESOLUTION PARSE ERROR: ${(e as Error).message}\n`,
-    );
+    process.stderr.write(`RESOLUTION PARSE ERROR: ${(e as Error).message}\n`);
     process.exit(1);
   }
-  const prior = readState(args.state!);
+  const prior = readState(stateFile);
   const next = advance(prior, resolution);
-  writeState(args.state!, next);
+  writeState(stateFile, next);
   if (next.kind === "failed") {
     process.stderr.write(`ENGINE ERROR: ${next.error}\n`);
     process.exit(1);
   }
-  if (next.kind === "done") emitDoneAndExit(next);
+  if (next.kind === "done") {emitDoneAndExit(next);}
   emitPauseAndExit(next);
 }
 

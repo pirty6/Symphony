@@ -14,13 +14,9 @@
  *   - completed Performance has correct shape     → integration with scaffoldPerformance
  */
 
-import {
-  createEngine,
-  advance,
-  MAESTRO_GO_PHRASES,
-  type Pause,
-  type Resolution,
-} from "./engine";
+import { createEngine, advance, MAESTRO_GO_PHRASES } from "./engine";
+import type { Pause } from "./types/pause";
+import type { Resolution } from "./types/resolution";
 import { listPatterns, getPattern } from "../patterns";
 import type { Pattern } from "../patterns/types";
 
@@ -38,9 +34,7 @@ function expectPause<K extends Pause["kind"]>(
     );
   }
   if (state.pause.kind !== kind) {
-    throw new Error(
-      `expected pause '${kind}', got '${state.pause.kind}'`,
-    );
+    throw new Error(`expected pause '${kind}', got '${state.pause.kind}'`);
   }
   return state.pause as Extract<Pause, { kind: K }>;
 }
@@ -105,7 +99,9 @@ describe("confirm-fit", () => {
       prompt: "rename loadScore to loadExecutableScore",
       patterns: allPatterns,
     });
-    const s1 = advance(s0, { kind: "confirm-fit", pauseId: pid(s0),
+    const s1 = advance(s0, {
+      kind: "confirm-fit",
+      pauseId: pid(s0),
       ok: false,
       reroute: "investigate",
     });
@@ -133,12 +129,14 @@ describe("confirm-fit", () => {
       prompt: "rename loadScore to loadExecutableScore",
       patterns: allPatterns,
     });
-    const s1 = advance(s0, { kind: "confirm-fit", pauseId: pid(s0),
+    const s1 = advance(s0, {
+      kind: "confirm-fit",
+      pauseId: pid(s0),
       ok: false,
       reroute: "nonexistent-pattern",
     });
     expect(s1.kind).toBe("failed");
-    if (s1.kind === "failed") expect(s1.error).toMatch(/reroute target/);
+    if (s1.kind === "failed") {expect(s1.error).toMatch(/reroute target/);}
   });
 });
 
@@ -155,7 +153,9 @@ describe("elicit-context", () => {
 
   test("empty value re-emits elicit-context with key still missing", () => {
     const s0 = reachElicit();
-    const s1 = advance(s0, { kind: "elicit-context", pauseId: pid(s0),
+    const s1 = advance(s0, {
+      kind: "elicit-context",
+      pauseId: pid(s0),
       values: { target: "", invariant: "imports type-check" },
     });
     const pause = expectPause(s1, "elicit-context");
@@ -164,7 +164,9 @@ describe("elicit-context", () => {
 
   test("whitespace-only value treated as empty", () => {
     const s0 = reachElicit();
-    const s1 = advance(s0, { kind: "elicit-context", pauseId: pid(s0),
+    const s1 = advance(s0, {
+      kind: "elicit-context",
+      pauseId: pid(s0),
       values: { target: "   ", invariant: "imports type-check" },
     });
     const pause = expectPause(s1, "elicit-context");
@@ -173,7 +175,9 @@ describe("elicit-context", () => {
 
   test("all keys filled advances to go-gate", () => {
     const s0 = reachElicit();
-    const s1 = advance(s0, { kind: "elicit-context", pauseId: pid(s0),
+    const s1 = advance(s0, {
+      kind: "elicit-context",
+      pauseId: pid(s0),
       values: { target: "rename loadScore", invariant: "imports type-check" },
     });
     expectPause(s1, "go-gate");
@@ -181,7 +185,9 @@ describe("elicit-context", () => {
 
   test("extra unknown keys are dropped silently (forward-compat)", () => {
     const s0 = reachElicit();
-    const s1 = advance(s0, { kind: "elicit-context", pauseId: pid(s0),
+    const s1 = advance(s0, {
+      kind: "elicit-context",
+      pauseId: pid(s0),
       values: {
         target: "rename loadScore",
         invariant: "imports type-check",
@@ -201,7 +207,9 @@ describe("go-gate", () => {
       patterns: allPatterns,
     });
     const s1 = advance(s0, { kind: "confirm-fit", pauseId: pid(s0), ok: true });
-    return advance(s1, { kind: "elicit-context", pauseId: pid(s1),
+    return advance(s1, {
+      kind: "elicit-context",
+      pauseId: pid(s1),
       values: { target: "rename loadScore", invariant: "imports type-check" },
     });
   }
@@ -213,19 +221,14 @@ describe("go-gate", () => {
     expect(pause.payload.beatIndex).toBe(0);
   });
 
-  test.each([
-    "sounds fine-ish",
-    "yeah maybe",
-    "ok i guess",
-    "fine",
-    "yes please",
-    "",
-    "  ",
-  ])("vague phrase '%s' re-emits go-gate", (phrase) => {
-    const s0 = reachGate();
-    const s1 = advance(s0, { kind: "go-gate", pauseId: pid(s0), phrase });
-    expectPause(s1, "go-gate");
-  });
+  test.each(["sounds fine-ish", "yeah maybe", "ok i guess", "fine", "yes please", "", "  "])(
+    "vague phrase '%s' re-emits go-gate",
+    (phrase) => {
+      const s0 = reachGate();
+      const s1 = advance(s0, { kind: "go-gate", pauseId: pid(s0), phrase });
+      expectPause(s1, "go-gate");
+    },
+  );
 
   test("phrase match is case-insensitive and trims whitespace", () => {
     const s0 = reachGate();
@@ -261,12 +264,10 @@ describe("draft-pattern MAX_ROUNDS", () => {
       prompt: "frobnicate the widget cluster",
       patterns: allPatterns,
     });
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 6; i += 1) {
       const pause = expectPause(state, "draft-pattern-round");
       expect(pause.payload.round).toBe(i + 1);
-      state = advance(state, { kind: "draft-pattern-round", pauseId: pid(state),
-        outcome: "edit",
-      });
+      state = advance(state, { kind: "draft-pattern-round", pauseId: pid(state), outcome: "edit" });
     }
     // 7th iteration should be terminal failure.
     expect(state.kind).toBe("failed");
@@ -281,15 +282,15 @@ describe("draft-pattern MAX_ROUNDS", () => {
       patterns: allPatterns,
     });
     expectPause(s0, "draft-pattern-round");
-    const s1 = advance(s0, { kind: "draft-pattern-round", pauseId: pid(s0),
+    const s1 = advance(s0, {
+      kind: "draft-pattern-round",
+      pauseId: pid(s0),
       outcome: "approve",
       nextDraft: makeStubPattern("frobnicate"),
     });
     // After approval, engine treats the new pattern as the active one
     // and proceeds to confirm-fit (or elicit-context if no requiredContext).
-    expect(["confirm-fit", "go-gate"]).toContain(
-      s1.kind === "running" ? s1.pause.kind : "",
-    );
+    expect(["confirm-fit", "go-gate"]).toContain(s1.kind === "running" ? s1.pause.kind : "");
   });
 });
 
@@ -310,9 +311,16 @@ describe("perform-beat shape validation", () => {
     const s0 = reachPerform();
     const pause0 = expectPause(s0, "perform-beat");
     expect(pause0.payload.beatIndex).toBe(0);
-    const s1 = advance(s0, { kind: "perform-beat", pauseId: pid(s0),
+    const s1 = advance(s0, {
+      kind: "perform-beat",
+      pauseId: pid(s0),
       voiceOutputs: [
-        { instrument: "percussion", output: "restated", confidence: 0.9, producedBy: "maestro-assessor" },
+        {
+          instrument: "percussion",
+          output: "restated",
+          confidence: 0.9,
+          producedBy: "maestro-assessor",
+        },
       ],
       verdict: {
         outcome: "applied",
@@ -327,8 +335,9 @@ describe("perform-beat shape validation", () => {
 
   test("missing instrument field → engine fails (footnote-bug guard)", () => {
     const s0 = reachPerform();
-    const s1 = advance(s0, { kind: "perform-beat", pauseId: pid(s0),
-      // @ts-expect-error intentional bad shape
+    const bad = {
+      kind: "perform-beat",
+      pauseId: pid(s0),
       voiceOutputs: [{ output: "x", confidence: 0.9 }],
       verdict: {
         outcome: "applied",
@@ -336,16 +345,18 @@ describe("perform-beat shape validation", () => {
         reason: "ok",
         shouldTerminate: false,
       },
-    });
+    } as unknown as Resolution;
+    const s1 = advance(s0, bad);
     expect(s1.kind).toBe("failed");
-    if (s1.kind === "failed") expect(s1.error).toMatch(/voice/i);
+    if (s1.kind === "failed") {expect(s1.error).toMatch(/voice/i);}
   });
 
   test("non-string output → engine fails", () => {
     const s0 = reachPerform();
-    const s1 = advance(s0, { kind: "perform-beat", pauseId: pid(s0),
+    const bad = {
+      kind: "perform-beat",
+      pauseId: pid(s0),
       voiceOutputs: [
-        // @ts-expect-error intentional bad shape
         { instrument: "percussion", output: 42, confidence: 0.9, producedBy: "maestro-assessor" },
       ],
       verdict: {
@@ -354,13 +365,16 @@ describe("perform-beat shape validation", () => {
         reason: "ok",
         shouldTerminate: false,
       },
-    });
+    } as unknown as Resolution;
+    const s1 = advance(s0, bad);
     expect(s1.kind).toBe("failed");
   });
 
   test("confidence out of [0,1] → engine fails", () => {
     const s0 = reachPerform();
-    const s1 = advance(s0, { kind: "perform-beat", pauseId: pid(s0),
+    const s1 = advance(s0, {
+      kind: "perform-beat",
+      pauseId: pid(s0),
       voiceOutputs: [
         { instrument: "percussion", output: "x", confidence: 1.5, producedBy: "maestro-assessor" },
       ],
@@ -376,9 +390,16 @@ describe("perform-beat shape validation", () => {
 
   test("shouldTerminate=true on failed verdict completes Performance with outcome=failed", () => {
     const s0 = reachPerform();
-    const s1 = advance(s0, { kind: "perform-beat", pauseId: pid(s0),
+    const s1 = advance(s0, {
+      kind: "perform-beat",
+      pauseId: pid(s0),
       voiceOutputs: [
-        { instrument: "percussion", output: "couldnt", confidence: 0.2, producedBy: "maestro-assessor" },
+        {
+          instrument: "percussion",
+          output: "couldnt",
+          confidence: 0.2,
+          producedBy: "maestro-assessor",
+        },
       ],
       verdict: {
         outcome: "failed",
@@ -419,7 +440,9 @@ describe("EngineState JSON round-trip", () => {
     // mid-run round-trip
     state = JSON.parse(JSON.stringify(state)) as typeof state;
     expectPause(state, "perform-beat");
-    state = advance(state, { kind: "perform-beat", pauseId: pid(state),
+    state = advance(state, {
+      kind: "perform-beat",
+      pauseId: pid(state),
       voiceOutputs: [
         { instrument: "percussion", output: "ok", confidence: 0.9, producedBy: "maestro-assessor" },
       ],
@@ -463,7 +486,7 @@ describe("debateComplexityHint", () => {
       debateComplexityHint: 1,
     });
     const seen: number[] = [];
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 6; i += 1) {
       const pause = expectPause(state, "draft-pattern-round");
       seen.push(pause.payload.complexity);
       state = advance(state, { kind: "draft-pattern-round", pauseId: pid(state), outcome: "edit" });
@@ -484,7 +507,7 @@ describe("pauseId idempotency", () => {
     // that forgot to echo pauseId.
     const s1 = advance(s0, { kind: "confirm-fit", ok: true } as unknown as Resolution);
     expect(s1.kind).toBe("failed");
-    if (s1.kind === "failed") expect(s1.error).toMatch(/pauseId is required/);
+    if (s1.kind === "failed") {expect(s1.error).toMatch(/pauseId is required/);}
   });
 
   test("stale pauseId (already-advanced state) fails the engine", () => {
@@ -507,7 +530,7 @@ describe("pauseId idempotency", () => {
       values: { target: "x", invariant: "y" },
     });
     expect(s2.kind).toBe("failed");
-    if (s2.kind === "failed") expect(s2.error).toMatch(/pauseId mismatch/);
+    if (s2.kind === "failed") {expect(s2.error).toMatch(/pauseId mismatch/);}
   });
 
   test("each pause has a fresh pauseId", () => {
@@ -544,7 +567,10 @@ describe("pauseId idempotency", () => {
 
   test("pauseIdFactory injection produces deterministic ids", () => {
     let counter = 0;
-    const factory = () => `pid-${++counter}`;
+    const factory = () => {
+      counter += 1;
+      return `pid-${counter}`;
+    };
     const s0 = createEngine({
       prompt: "rename loadScore to loadExecutableScore",
       patterns: allPatterns,
@@ -574,10 +600,9 @@ describe("voiceOutputs.producedBy validation", () => {
 
   test("missing producedBy fails the engine", () => {
     const s0 = reachPerform();
-    const s1 = advance(s0, {
+    const bad = {
       kind: "perform-beat",
       pauseId: pid(s0),
-      // @ts-expect-error intentional missing producedBy
       voiceOutputs: [{ instrument: "percussion", output: "x", confidence: 0.9 }],
       verdict: {
         outcome: "applied",
@@ -585,18 +610,18 @@ describe("voiceOutputs.producedBy validation", () => {
         reason: "ok",
         shouldTerminate: false,
       },
-    });
+    } as unknown as Resolution;
+    const s1 = advance(s0, bad);
     expect(s1.kind).toBe("failed");
-    if (s1.kind === "failed") expect(s1.error).toMatch(/producedBy/);
+    if (s1.kind === "failed") {expect(s1.error).toMatch(/producedBy/);}
   });
 
   test("invalid producedBy value fails the engine", () => {
     const s0 = reachPerform();
-    const s1 = advance(s0, {
+    const bad = {
       kind: "perform-beat",
       pauseId: pid(s0),
       voiceOutputs: [
-        // @ts-expect-error intentional bad enum value
         { instrument: "percussion", output: "x", confidence: 0.9, producedBy: "Composer" },
       ],
       verdict: {
@@ -605,9 +630,10 @@ describe("voiceOutputs.producedBy validation", () => {
         reason: "ok",
         shouldTerminate: false,
       },
-    });
+    } as unknown as Resolution;
+    const s1 = advance(s0, bad);
     expect(s1.kind).toBe("failed");
-    if (s1.kind === "failed") expect(s1.error).toMatch(/producedBy/);
+    if (s1.kind === "failed") {expect(s1.error).toMatch(/producedBy/);}
   });
 
   test("producedBy persists onto PerformedVoice", () => {
@@ -647,7 +673,9 @@ describe("resolution kind mismatch", () => {
       patterns: allPatterns,
     });
     // s0 is paused on confirm-fit but we submit a perform-beat resolution.
-    const s1 = advance(s0, { kind: "perform-beat", pauseId: pid(s0),
+    const s1 = advance(s0, {
+      kind: "perform-beat",
+      pauseId: pid(s0),
       voiceOutputs: [
         { instrument: "percussion", output: "x", confidence: 0.9, producedBy: "maestro-assessor" },
       ],
@@ -669,7 +697,8 @@ describe("resolution kind mismatch", () => {
 
 describe("full run integration", () => {
   test("complete investigate run yields a shape-valid Performance", () => {
-    const investigate = getPattern("investigate")!;
+    const investigate = getPattern("investigate");
+    if (!investigate) {throw new Error("investigate pattern not found");}
     const beats = investigate.score.beats.length;
 
     let state = createEngine({
@@ -679,10 +708,12 @@ describe("full run integration", () => {
     state = advance(state, { kind: "confirm-fit", pauseId: pid(state), ok: true });
     state = advance(state, { kind: "go-gate", pauseId: pid(state), phrase: "go" });
 
-    for (let i = 0; i < beats; i++) {
+    for (let i = 0; i < beats; i += 1) {
       const pause = expectPause(state, "perform-beat");
       expect(pause.payload.beatIndex).toBe(i);
-      state = advance(state, { kind: "perform-beat", pauseId: pid(state),
+      state = advance(state, {
+        kind: "perform-beat",
+        pauseId: pid(state),
         voiceOutputs: [
           {
             instrument: pause.payload.beat.voices[0].instrument,
@@ -714,17 +745,11 @@ describe("full run integration", () => {
         expect(typeof b.stateHash).toBe("string");
         expect(b.verdict?.outcome).toBe("applied");
       });
-      expect(
-        Object.keys(performance as unknown as Record<string, unknown>),
-      ).toEqual(
+      expect(Object.keys(performance as unknown as Record<string, unknown>)).toEqual(
         expect.arrayContaining(["scoreId", "beats", "startedAt", "completedAt", "outcome"]),
       );
-      expect(
-        (performance as unknown as Record<string, unknown>)["schemaVersion"],
-      ).toBeUndefined();
-      expect(
-        (performance as unknown as Record<string, unknown>)["performedBeats"],
-      ).toBeUndefined();
+      expect((performance as unknown as Record<string, unknown>)["schemaVersion"]).toBeUndefined();
+      expect((performance as unknown as Record<string, unknown>)["performedBeats"]).toBeUndefined();
     }
   });
 });

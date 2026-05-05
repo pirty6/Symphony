@@ -66,14 +66,15 @@ function parseArgs(argv: readonly string[]): CliArgs {
   }
   const out: Record<string, string> = {};
   const flags = new Set<string>();
-  for (let i = nextIdx; i < args.length; i++) {
+  for (let i = nextIdx; i < args.length; i += 1) {
     const arg = args[i];
-    if (!arg.startsWith("--")) continue;
+    if (!arg.startsWith("--")) {continue;}
     const eq = arg.indexOf("=");
     if (eq !== -1) {
       out[arg.substring(2, eq)] = arg.substring(eq + 1);
     } else if (i + 1 < args.length && !args[i + 1].startsWith("--")) {
-      out[arg.substring(2)] = args[++i];
+      i += 1;
+      out[arg.substring(2)] = args[i];
     } else {
       flags.add(arg.substring(2));
     }
@@ -121,11 +122,12 @@ function writeJson(file: string, value: unknown): void {
 }
 
 function runFromPattern(args: CliArgs): number {
-  if (!args.pattern || !args.input || !args.out) usage();
-  const pattern = getPattern(args.pattern!);
+  const { pattern: patternName, input, out } = args;
+  if (!patternName || !input || !out) {usage();}
+  const pattern = getPattern(patternName);
   if (!pattern) {
     process.stderr.write(
-      `UNKNOWN PATTERN: ${args.pattern}. Available: ${listPatterns()
+      `UNKNOWN PATTERN: ${patternName}. Available: ${listPatterns()
         .map((p) => p.score.pattern)
         .join(", ")}\n`,
     );
@@ -133,7 +135,7 @@ function runFromPattern(args: CliArgs): number {
   }
   let parsed: { problem?: string; context?: Record<string, unknown> };
   try {
-    parsed = readJson(args.input!);
+    parsed = readJson(input);
   } catch (err) {
     process.stderr.write(`READ ERROR: ${(err as Error).message}\n`);
     return 1;
@@ -154,65 +156,68 @@ function runFromPattern(args: CliArgs): number {
     process.stderr.write(`COMPILE ERROR: ${(err as Error).message}\n`);
     return 1;
   }
-  writeJson(args.out!, score);
+  writeJson(out, score);
   process.stdout.write(
-    `OK compiled (${pattern.score.pattern}):\n  scoreId        = ${score.id}\n  beats          = ${score.beats.length}\n  activeLevels   = [${score.frequencyMap.activeLevels.join(", ")}]\n  out            = ${args.out}\n`,
+    `OK compiled (${pattern.score.pattern}):\n  scoreId        = ${score.id}\n  beats          = ${score.beats.length}\n  activeLevels   = [${score.frequencyMap.activeLevels.join(", ")}]\n  out            = ${out}\n`,
   );
   return 0;
 }
 
 function runParse(args: CliArgs): number {
-  if (!args.input || !args.out) usage();
-  let input: AlgorithmInput;
+  const { input, out } = args;
+  if (!input || !out) {usage();}
+  let parsed: AlgorithmInput;
   try {
-    input = readJson(args.input!);
+    parsed = readJson(input);
   } catch (err) {
     process.stderr.write(`READ ERROR: ${(err as Error).message}\n`);
     return 1;
   }
   let score: ExecutableScore;
   try {
-    score = parseAlgorithm(input);
+    score = parseAlgorithm(parsed);
   } catch (err) {
     process.stderr.write(`PARSE ERROR: ${(err as Error).message}\n`);
     return 1;
   }
-  writeJson(args.out!, score);
+  writeJson(out, score);
   process.stdout.write(
-    `OK parsed:\n  scoreId        = ${score.id}\n  beats          = ${score.beats.length}\n  activeLevels   = [${score.frequencyMap.activeLevels.join(", ")}]\n  out            = ${args.out}\n`,
+    `OK parsed:\n  scoreId        = ${score.id}\n  beats          = ${score.beats.length}\n  activeLevels   = [${score.frequencyMap.activeLevels.join(", ")}]\n  out            = ${out}\n`,
   );
   return 0;
 }
 
 function runScaffold(args: CliArgs): number {
-  if (!args.score || !args.out) usage();
+  const { score: scoreFile, out } = args;
+  if (!scoreFile || !out) {usage();}
   let score: ExecutableScore;
   try {
-    score = loadExecutableScore(args.score!);
+    score = loadExecutableScore(scoreFile);
   } catch (err) {
     process.stderr.write(`LOAD ERROR: ${(err as Error).message}\n`);
     return 1;
   }
   const performance = scaffoldPerformance(score);
-  writeJson(args.out!, performance);
+  writeJson(out, performance);
   process.stdout.write(
-    `OK scaffold:\n  scoreId  = ${performance.scoreId}\n  beats    = ${performance.beats.length}\n  outcome  = ${performance.outcome}\n  out      = ${args.out}\n`,
+    `OK scaffold:\n  scoreId  = ${performance.scoreId}\n  beats    = ${performance.beats.length}\n  outcome  = ${performance.outcome}\n  out      = ${out}\n`,
   );
   return 0;
 }
 
 function runSaveRun(args: CliArgs): number {
-  if (!args.pattern || !args.score || !args.performance) usage();
-  const pattern = getPattern(args.pattern!);
+  const { pattern: patternName, score: scoreFile, performance: performanceFile } = args;
+  if (!patternName || !scoreFile || !performanceFile) {usage();}
+  const pattern = getPattern(patternName);
   if (!pattern) {
-    process.stderr.write(`UNKNOWN PATTERN: ${args.pattern}\n`);
+    process.stderr.write(`UNKNOWN PATTERN: ${patternName}\n`);
     return 1;
   }
   let score: ExecutableScore;
   let performance;
   try {
-    score = loadExecutableScore(args.score!);
-    performance = loadPerformance(args.performance!);
+    score = loadExecutableScore(scoreFile);
+    performance = loadPerformance(performanceFile);
   } catch (err) {
     process.stderr.write(`LOAD ERROR: ${(err as Error).message}\n`);
     return 1;
@@ -265,10 +270,11 @@ function validateScoreShape(score: ExecutableScore): string[] {
 }
 
 function runVerify(args: CliArgs): number {
-  if (!args.file) usage();
+  const { file } = args;
+  if (!file) {usage();}
   let run: SavedRun;
   try {
-    run = loadRun(args.file!);
+    run = loadRun(file);
   } catch (err) {
     process.stderr.write(`LOAD ERROR: ${(err as Error).message}\n`);
     return 1;
@@ -276,7 +282,7 @@ function runVerify(args: CliArgs): number {
   const errors = validateScoreShape(run.executableScore);
   if (errors.length > 0) {
     process.stderr.write("SCORE VALIDATION ERRORS:\n");
-    for (const e of errors) process.stderr.write(`  - ${e}\n`);
+    for (const e of errors) {process.stderr.write(`  - ${e}\n`);}
     return 1;
   }
   process.stdout.write(
@@ -344,8 +350,8 @@ function runListPatterns(args: CliArgs): number {
 }
 
 function runPatternView(args: CliArgs): number {
-  if (args.subcommand !== "view") usage();
-  if (!args.pattern) usage();
+  if (args.subcommand !== "view") {usage();}
+  if (!args.pattern) {usage();}
   const pattern = getPattern(args.pattern);
   if (!pattern) {
     process.stderr.write(`UNKNOWN PATTERN: ${args.pattern}\n`);

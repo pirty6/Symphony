@@ -70,7 +70,7 @@ export async function performScore(
   const performed: PerformedBeat[] = [];
   let terminatedEarly = false;
 
-  for (let i = 0; i < score.beats.length; i++) {
+  for (let i = 0; i < score.beats.length; i += 1) {
     const beat = score.beats[i];
     const result = await executeBeat({
       beatIndex: i,
@@ -144,14 +144,14 @@ function deriveOutcome(
   beats: readonly PerformedBeat[],
   terminatedEarly: boolean,
 ): PerformanceOutcome {
-  if (beats.length === 0) return "in-progress";
+  if (beats.length === 0) {return "in-progress";}
   const verdicts = beats.map((b) => b.verdict);
-  if (verdicts.every((v) => v === null)) return "partial";
-  if (verdicts.some((v) => v?.outcome === "failed")) return "failed";
+  if (verdicts.every((v) => v === null)) {return "partial";}
+  if (verdicts.some((v) => v?.outcome === "failed")) {return "failed";}
   if (terminatedEarly) {
     const last = verdicts[verdicts.length - 1];
-    if (last?.outcome === "applied") return "success";
-    if (last?.outcome === "failed") return "failed";
+    if (last?.outcome === "applied") {return "success";}
+    if (last?.outcome === "failed") {return "failed";}
     return "partial";
   }
   return "success";

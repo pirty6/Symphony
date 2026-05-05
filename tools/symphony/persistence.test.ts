@@ -100,9 +100,10 @@ describe("saveRun → loadRun round-trip", () => {
     const run = buildSavedRun();
     const file = saveRun(run, tmp);
     const corrupted = JSON.parse(fs.readFileSync(file, "utf8")) as SavedRun;
+    const tamperedPerformance: Performance = { ...corrupted.performance, scoreId: "deadbeef" };
     const tampered = {
       ...corrupted,
-      performance: { ...corrupted.performance, scoreId: "deadbeef" } as Performance,
+      performance: tamperedPerformance,
     };
     fs.writeFileSync(file, JSON.stringify(tampered));
     expect(() => loadRun(file)).toThrow(/does not match/);
@@ -114,13 +115,14 @@ describe("saveRun → loadRun round-trip", () => {
     const file = saveRun(run, tmp);
     const data = JSON.parse(fs.readFileSync(file, "utf8")) as SavedRun;
     const beats = [...data.performance.beats];
-    if (beats.length < 2) return; // not exercising on degenerate runs
+    if (beats.length < 2) {return;} // not exercising on degenerate runs
+    const swappedPerformance: Performance = {
+      ...data.performance,
+      beats: [beats[1], beats[0], ...beats.slice(2)],
+    };
     const swapped = {
       ...data,
-      performance: {
-        ...data.performance,
-        beats: [beats[1], beats[0], ...beats.slice(2)],
-      } as Performance,
+      performance: swappedPerformance,
     };
     fs.writeFileSync(file, JSON.stringify(swapped));
     expect(() => loadRun(file)).toThrow(/beatIndex/);

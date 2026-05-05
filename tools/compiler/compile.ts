@@ -71,7 +71,7 @@ function buildFrequencyMap(
   const counts: Record<Level, number> = {
     1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0,
   };
-  for (const beat of beats) counts[beat.level]++;
+  for (const beat of beats) {counts[beat.level] += 1;}
   const total = beats.length;
 
   const activeLevels = total === 0

@@ -65,8 +65,8 @@ export function computeExecutableScoreId(
     beats: score.beats,
     generatedFrom: score.generatedFrom,
   };
-  if (score.pattern !== undefined) base["pattern"] = score.pattern;
-  if (score.context !== undefined) base["context"] = score.context;
+  if (score.pattern !== undefined) {base["pattern"] = score.pattern;}
+  if (score.context !== undefined) {base["context"] = score.context;}
   return sha256(JSON.stringify(base));
 }
 
@@ -173,8 +173,8 @@ function verdictsEqual(
   a: MoveVerdict | null,
   b: MoveVerdict | null,
 ): boolean {
-  if (a === null && b === null) return true;
-  if (a === null || b === null) return false;
+  if (a === null && b === null) {return true;}
+  if (a === null || b === null) {return false;}
   return (
     a.outcome === b.outcome &&
     a.confidence === b.confidence &&
@@ -187,9 +187,9 @@ function proseDiffersAtBeat(
   saved: PerformedBeat,
   fresh: PerformedBeat,
 ): boolean {
-  if (saved.voices.length !== fresh.voices.length) return true;
-  for (let i = 0; i < saved.voices.length; i++) {
-    if (saved.voices[i].output !== fresh.voices[i].output) return true;
+  if (saved.voices.length !== fresh.voices.length) {return true;}
+  for (let i = 0; i < saved.voices.length; i += 1) {
+    if (saved.voices[i].output !== fresh.voices[i].output) {return true;}
   }
   return false;
 }
@@ -226,7 +226,7 @@ export function detectDivergence(
   const environmental: HashDelta[] = [];
   let prose = 0;
 
-  for (let i = 0; i < saved.beats.length; i++) {
+  for (let i = 0; i < saved.beats.length; i += 1) {
     const s = saved.beats[i];
     const f = fresh.beats[i];
 
@@ -252,7 +252,7 @@ export function detectDivergence(
       });
     }
 
-    if (proseDiffersAtBeat(s, f)) prose += 1;
+    if (proseDiffersAtBeat(s, f)) {prose += 1;}
   }
 
   return { structural: false, semantic, environmental, prose };

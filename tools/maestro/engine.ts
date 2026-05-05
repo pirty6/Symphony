@@ -95,7 +95,9 @@ export function advance(
   resolution: Resolution,
   opts: AdvanceOptions = {},
 ): EngineState {
-  if (state.kind !== "running") return state;
+  if (state.kind !== "running") {
+    return state;
+  }
   const pause = state.pause;
   const internal = state.internal;
   const clock = opts.clock ?? defaultClock;
@@ -239,9 +241,13 @@ function resolveElicitContext(
   res: ElicitRes,
   nid: () => string,
 ): EngineState {
-  if (!internal.active) return failed("elicit-context: no active pattern");
+  if (!internal.active) {
+    return failed("elicit-context: no active pattern");
+  }
   const activePattern = findPattern(internal.patterns, internal.active.patternName);
-  if (!activePattern) return failed("elicit-context: active pattern not registered");
+  if (!activePattern) {
+    return failed("elicit-context: active pattern not registered");
+  }
   const required = activePattern.requiredContext;
   const merged: Record<string, string> = { ...internal.context };
   for (const key of required) {
@@ -264,9 +270,13 @@ function resolveGoGate(
   clock: () => string,
   nid: () => string,
 ): EngineState {
-  if (!internal.active) return failed("go-gate: no active pattern");
+  if (!internal.active) {
+    return failed("go-gate: no active pattern");
+  }
   const activePattern = findPattern(internal.patterns, internal.active.patternName);
-  if (!activePattern) return failed("go-gate: active pattern not registered");
+  if (!activePattern) {
+    return failed("go-gate: active pattern not registered");
+  }
   const phrase = res.phrase.trim().toLowerCase();
   if (!(MAESTRO_GO_PHRASES as readonly string[]).includes(phrase)) {
     return runningPause(internal, makeGoGatePause(activePattern, internal.context, nid));
@@ -307,7 +317,7 @@ function resolvePerformBeat(
   if (verdictError) {
     return failed(`perform-beat[${pause.payload.beatIndex}]: ${verdictError}`);
   }
-  if (!internal.score) return failed("perform-beat: no compiled score");
+  if (!internal.score) {return failed("perform-beat: no compiled score");}
 
   const performed: PerformedBeat = {
     beatIndex: pause.payload.beatIndex,
@@ -349,7 +359,7 @@ function enterConfirmFit(
   nid: () => string,
 ): EngineState {
   const target = findPattern(internal.patterns, summary.pattern);
-  if (!target) return failed(`confirm-fit: pattern '${summary.pattern}' not registered`);
+  if (!target) {return failed(`confirm-fit: pattern '${summary.pattern}' not registered`);}
   const next: InternalState = {
     ...internal,
     active: { patternName: target.score.pattern, matchedVerb: summary.matchedVerb },
@@ -364,9 +374,9 @@ function enterConfirmFit(
 }
 
 function enterAfterConfirmFit(internal: InternalState, nid: () => string): EngineState {
-  if (!internal.active) return failed("after-confirm-fit: no active pattern");
+  if (!internal.active) {return failed("after-confirm-fit: no active pattern");}
   const activePattern = findPattern(internal.patterns, internal.active.patternName);
-  if (!activePattern) return failed("after-confirm-fit: active pattern not registered");
+  if (!activePattern) {return failed("after-confirm-fit: active pattern not registered");}
   const required = activePattern.requiredContext;
   if (required.length === 0) {
     return enterGoGate(internal, nid);
@@ -398,9 +408,9 @@ function enterDraftPatternRound(
 }
 
 function enterGoGate(internal: InternalState, nid: () => string): EngineState {
-  if (!internal.active) return failed("go-gate: no active pattern");
+  if (!internal.active) {return failed("go-gate: no active pattern");}
   const activePattern = findPattern(internal.patterns, internal.active.patternName);
-  if (!activePattern) return failed("go-gate: active pattern not registered");
+  if (!activePattern) {return failed("go-gate: active pattern not registered");}
   return runningPause(internal, makeGoGatePause(activePattern, internal.context, nid));
 }
 
@@ -409,9 +419,9 @@ function enterPerformBeat(
   beatIndex: number,
   nid: () => string,
 ): EngineState {
-  if (!internal.score) return failed("perform-beat: no compiled score");
+  if (!internal.score) {return failed("perform-beat: no compiled score");}
   const beat = internal.score.beats[beatIndex];
-  if (!beat) return failed(`perform-beat: out-of-range index ${beatIndex}`);
+  if (!beat) {return failed(`perform-beat: out-of-range index ${beatIndex}`);}
   const previousOutputs = internal.performedBeats.map((b) =>
     b.voices.map((v) => v.output).join("\n"),
   );
@@ -429,7 +439,7 @@ function finishRun(
   terminatedEarly: boolean,
   clock: () => string,
 ): EngineState {
-  if (!internal.score) return failed("finish-run: no compiled score");
+  if (!internal.score) {return failed("finish-run: no compiled score");}
   const performance: Performance = {
     scoreId: internal.score.id,
     beats: internal.performedBeats,
@@ -501,7 +511,7 @@ function validateVoiceOutputs(outputs: PerformRes["voiceOutputs"], beat: Beat): 
   if (outputs.length !== beat.voices.length) {
     return `voiceOutputs length ${outputs.length} != beat.voices length ${beat.voices.length}`;
   }
-  for (let i = 0; i < outputs.length; i++) {
+  for (let i = 0; i < outputs.length; i += 1) {
     const v = outputs[i] as Partial<PerformRes["voiceOutputs"][number]>;
     if (typeof v?.instrument !== "string" || v.instrument === "") {
       return `voiceOutputs[${i}].instrument must be a non-empty string`;
@@ -531,14 +541,14 @@ function validateVoiceOutputs(outputs: PerformRes["voiceOutputs"], beat: Beat): 
 }
 
 function validateVerdict(v: MoveVerdict): string | null {
-  if (!v) return "verdict required";
+  if (!v) {return "verdict required";}
   if (!["applied", "failed", "skipped"].includes(v.outcome)) {
     return `verdict.outcome invalid: ${String(v.outcome)}`;
   }
   if (typeof v.confidence !== "number" || v.confidence < 0 || v.confidence > 1) {
     return "verdict.confidence must be a number in [0,1]";
   }
-  if (typeof v.reason !== "string") return "verdict.reason must be a string";
+  if (typeof v.reason !== "string") {return "verdict.reason must be a string";}
   if (typeof v.shouldTerminate !== "boolean") {
     return "verdict.shouldTerminate must be boolean";
   }
@@ -556,7 +566,7 @@ function bestVerbFor(prompt: string, pattern: Pattern): string | null {
   let best: string | null = null;
   for (const verb of pattern.verbTriggers) {
     if (lower.includes(verb.toLowerCase())) {
-      if (!best || verb.length > best.length) best = verb;
+      if (!best || verb.length > best.length) {best = verb;}
     }
   }
   return best;
@@ -566,7 +576,7 @@ function matchVerbs(prompt: string, patterns: readonly Pattern[]): readonly Patt
   const hits: PatternSummary[] = [];
   for (const p of patterns) {
     const verb = bestVerbFor(prompt, p);
-    if (verb) hits.push({ pattern: p.score.pattern, matchedVerb: verb });
+    if (verb) {hits.push({ pattern: p.score.pattern, matchedVerb: verb });}
   }
   return hits;
 }
@@ -583,8 +593,8 @@ function deriveOutcome(
   beats: readonly PerformedBeat[],
   terminatedEarly: boolean,
 ): Performance["outcome"] {
-  if (beats.length === 0) return "in-progress";
-  if (beats.some((b) => b.verdict?.outcome === "failed")) return "failed";
+  if (beats.length === 0) {return "in-progress";}
+  if (beats.some((b) => b.verdict?.outcome === "failed")) {return "failed";}
   if (terminatedEarly) {
     const last = beats[beats.length - 1].verdict;
     return last?.outcome === "applied" ? "success" : "partial";

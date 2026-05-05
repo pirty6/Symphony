@@ -102,8 +102,8 @@ export function beatLegality(
   let worst: Legality = "legal";
   for (const v of voices) {
     const l = pairLegality(level, v.instrument);
-    if (l === "illegal") return "illegal";
-    if (l === "unusual") worst = "unusual";
+    if (l === "illegal") {return "illegal";}
+    if (l === "unusual") {worst = "unusual";}
   }
   return worst;
 }

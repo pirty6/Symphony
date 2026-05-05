@@ -9,7 +9,9 @@
 
 import type { Pattern } from "../patterns/types";
 import type { Beat } from "../symphony/types";
-import { MAESTRO_DRAFT_MAX_ROUNDS, MAESTRO_GO_PHRASES, type Complexity, type Pause, type PatternSummary } from "./engine";
+import { MAESTRO_DRAFT_MAX_ROUNDS, MAESTRO_GO_PHRASES } from "./engine";
+import type { Pause, PatternSummary } from "./types/pause";
+import type { Complexity } from "./types/types";
 
 // ── Per-pause builders ─────────────────────────────────────────────
 
@@ -20,11 +22,7 @@ export function composerPromptFor(pause: Pause): string {
     case "confirm-fit":
       return confirmComposer(pause.payload.pattern, pause.payload.matchedVerb);
     case "draft-pattern-round":
-      return draftComposer(
-        pause.payload.round,
-        pause.payload.complexity,
-        pause.payload.priorDraft,
-      );
+      return draftComposer(pause.payload.round, pause.payload.complexity, pause.payload.priorDraft);
     case "elicit-context":
       return elicitComposer(
         pause.payload.pattern,
@@ -32,11 +30,7 @@ export function composerPromptFor(pause: Pause): string {
         pause.payload.collected,
       );
     case "go-gate":
-      return goGateComposer(
-        pause.payload.pattern,
-        pause.payload.context,
-        pause.payload.beats,
-      );
+      return goGateComposer(pause.payload.pattern, pause.payload.context, pause.payload.beats);
     case "perform-beat":
       return performComposer(pause.payload.beatIndex, pause.payload.beat);
   }
@@ -94,11 +88,7 @@ function confirmInstrument(pattern: string): string {
   return `Confirm pattern '${pattern}' or reroute.`;
 }
 
-function draftComposer(
-  round: number,
-  complexity: Complexity,
-  priorDraft: Pattern | null,
-): string {
+function draftComposer(round: number, complexity: Complexity, priorDraft: Pattern | null): string {
   const agents = [
     "proposer",
     complexity >= 2 ? "skeptic" : null,
