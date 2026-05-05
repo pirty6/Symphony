@@ -1,0 +1,223 @@
+/**
+ * compile.ts — Compiler: PatternScore + problem + context → Score.
+ *
+ * Two entry points, mirroring the two authoring paths:
+ *
+ *   compileScore(pattern, { problem, context })
+ *     The preferred path. Pure function: same inputs → same Score
+ *     (modulo `generatedAt`). Validates `context` against the Pattern's
+ *     `requiredContext` and copies the static directives from
+ *     `pattern.score.beats` verbatim into the executable Score.
+ *
+ *   parseAlgorithm(input)
+ *     Low-level fallback. Caller authors steps and annotations directly.
+ *     Used when the user-edited algorithm diverged from any pattern
+ *     (extra steps, custom verbs). Maestro should rarely need this.
+ *
+ * No phase loop, no LLM, no classification — maestro already did that
+ * work. Pure deterministic shape conversion.
+ *
+ * The directive on each beat is **static prose** authored on the
+ * Pattern. Repo-specific knobs live on `Score.context`, not interpolated
+ * into directive text. The agent at execution time reads the directive
+ * and the context together.
+ */
+
+import { fingerprintProblem, computeExecutableScoreId } from "../symphony/persistence";
+import {
+  DOMINANCE_THRESHOLD,
+  LEVELS,
+  type Beat,
+  type DomainKey,
+  type FrequencyMap,
+  type InstrumentType,
+  type Level,
+  type ExecutableScore,
+  type Shape,
+  type TempoConfig,
+  type Voice,
+} from "../symphony/types";
+import type { Pattern, PatternScore } from "../patterns/types";
+
+// ── Low-level Algorithm input ──────────────────────────────────────
+
+export interface AlgorithmStep {
+  /** Verb identifier matching an annotation entry (e.g., "clarify"). */
+  readonly verb: string;
+  /** The full directive text for this beat. */
+  readonly directive: string;
+}
+
+export interface AlgorithmAnnotation {
+  readonly verb: string;
+  readonly level: Level;
+  readonly instrument: InstrumentType;
+}
+
+export interface AlgorithmInput {
+  /** Raw user prompt; fed to fingerprintProblem. */
+  readonly problem: string;
+  /** Domain key for FrequencyMap.key (e.g., "typescript/investigate"). */
+  readonly domain: DomainKey;
+  readonly steps: readonly AlgorithmStep[];
+  readonly annotations: readonly AlgorithmAnnotation[];
+  readonly tempo?: TempoConfig;
+  readonly shape?: Shape;
+  readonly generatedAt?: string;
+}
+
+// ── Derivation ─────────────────────────────────────────────────────
+
+function buildFrequencyMap(
+  beats: readonly Beat[],
+  domain: DomainKey,
+  shape: Shape,
+): FrequencyMap {
+  const counts: Record<Level, number> = {
+    1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0,
+  };
+  for (const beat of beats) counts[beat.level]++;
+  const total = beats.length;
+
+  const levels: Record<Level, number> = {
+    1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0,
+  };
+  for (const level of LEVELS) {
+    levels[level] = total === 0 ? 0 : counts[level] / total;
+  }
+
+  const dominantLevels = LEVELS.filter(
+    (l) => levels[l] >= DOMINANCE_THRESHOLD,
+  );
+
+  return { levels, dominantLevels, shape, key: domain };
+}
+
+function patternBeatsToBeats(score: PatternScore): readonly Beat[] {
+  return score.beats.map((pb) => {
+    const voices: readonly Voice[] = [{ instrument: pb.instrument }];
+    return { level: pb.level, voices, directive: pb.directive };
+  });
+}
+
+// ── Pattern path ───────────────────────────────────────────────────
+
+export interface CompileArgs {
+  /** Raw user prompt; fed to fingerprintProblem. */
+  readonly problem: string;
+  /**
+   * Repo-specific keys the pattern may consume at execution time
+   * (target, invariant, scope, contract, etc.). Validated against
+   * `pattern.requiredContext`.
+   */
+  readonly context?: Readonly<Record<string, unknown>>;
+  /** Optional. Override for determinism in tests. */
+  readonly generatedAt?: string;
+}
+
+/**
+ * Compile a Pattern + concrete inputs into an executable Score.
+ *
+ * Validates the supplied `context` against `pattern.requiredContext`.
+ * Throws when a required key is missing or empty.
+ */
+export function compileScore(pattern: Pattern, args: CompileArgs): ExecutableScore {
+  const context = args.context ?? {};
+  for (const key of pattern.requiredContext) {
+    const value = context[key];
+    if (
+      value === undefined ||
+      value === null ||
+      (typeof value === "string" && value.trim().length === 0)
+    ) {
+      throw new Error(
+        `compileScore: pattern "${pattern.score.pattern}" requires context.${key}`,
+      );
+    }
+  }
+
+  const beats = patternBeatsToBeats(pattern.score);
+  const frequencyMap = buildFrequencyMap(
+    beats,
+    pattern.score.domain,
+    pattern.score.defaultShape,
+  );
+  const generatedFrom = fingerprintProblem(args.problem);
+  const tempo: TempoConfig = {} as TempoConfig;
+
+  const partial: Omit<ExecutableScore, "id" | "generatedAt"> = {
+    schemaVersion: 1,
+    frequencyMap,
+    tempo,
+    beats,
+    generatedFrom,
+    pattern: pattern.score.pattern,
+    context: { ...context },
+  };
+  const id = computeExecutableScoreId(partial);
+  const generatedAt = args.generatedAt ?? new Date().toISOString();
+
+  return { ...partial, id, generatedAt };
+}
+
+// ── Low-level Algorithm path (fallback) ────────────────────────────
+
+/**
+ * Convert an explicit algorithm into a Score. Used when the user-edited
+ * algorithm diverged from any pattern. Throws on step/annotation
+ * mismatches — those are caller errors.
+ */
+export function parseAlgorithm(input: AlgorithmInput): ExecutableScore {
+  if (input.steps.length === 0) {
+    throw new Error("parseAlgorithm: steps array is empty");
+  }
+
+  const annotationsByVerb = new Map<string, AlgorithmAnnotation>();
+  for (const annotation of input.annotations) {
+    if (annotationsByVerb.has(annotation.verb)) {
+      throw new Error(
+        `parseAlgorithm: duplicate annotation for verb "${annotation.verb}"`,
+      );
+    }
+    annotationsByVerb.set(annotation.verb, annotation);
+  }
+
+  const usedVerbs = new Set<string>();
+  const beats: Beat[] = input.steps.map((step) => {
+    const annotation = annotationsByVerb.get(step.verb);
+    if (!annotation) {
+      throw new Error(
+        `parseAlgorithm: step "${step.verb}" has no matching annotation`,
+      );
+    }
+    usedVerbs.add(step.verb);
+    const voices: readonly Voice[] = [{ instrument: annotation.instrument }];
+    return { level: annotation.level, voices, directive: step.directive };
+  });
+
+  for (const verb of annotationsByVerb.keys()) {
+    if (!usedVerbs.has(verb)) {
+      throw new Error(
+        `parseAlgorithm: annotation "${verb}" has no matching step`,
+      );
+    }
+  }
+
+  const tempo: TempoConfig = input.tempo ?? ({} as TempoConfig);
+  const shape: Shape = input.shape ?? "layered";
+
+  const frequencyMap = buildFrequencyMap(beats, input.domain, shape);
+  const generatedFrom = fingerprintProblem(input.problem);
+
+  const partial: Omit<ExecutableScore, "id" | "generatedAt"> = {
+    schemaVersion: 1,
+    frequencyMap,
+    tempo,
+    beats,
+    generatedFrom,
+  };
+  const id = computeExecutableScoreId(partial);
+  const generatedAt = input.generatedAt ?? new Date().toISOString();
+
+  return { ...partial, id, generatedAt };
+}

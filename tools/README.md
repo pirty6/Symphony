@@ -1,93 +1,126 @@
-# `tools/` — Map of the systems
+# tools/
 
-This directory contains **two independent systems**.
+The tooling that supports maestro-driven, score-verified work in this repo.
 
-```
+```text
 tools/
-├── meta-score/       # 8-phase prompt-loop CLI (legacy, fallback only)
-└── symphony/         # Score / Beat / Performance — runtime artifacts for maestro
+├── patterns/      # PatternLibrary: typed, reusable algorithm templates (.ts is canonical)
+├── compiler/      # Pattern + Params → ExecutableScore conversion
+├── symphony/      # Runtime: types, ExecutableScore, Performance, verify
+└── scores/        # SavedRun store (data) + library index
 ```
 
-The two are unrelated and do not import each other. `meta-score` is the
-older approach; `symphony` is what `maestro` uses today.
+Patterns are code. Runs are data. They never live in the same directory.
 
-> Build artifacts (`tools/lib/`) are produced by `tsc` and are not checked
-> in. Runtime entry points use `tsx` and execute the `.ts` sources
-> directly; `lib/` only matters when the package is published.
+The split mirrors the genericity levels of work:
 
----
+| Level | What                              | Where                       |
+|-------|-----------------------------------|-----------------------------|
+| 1     | Universal protocol (debate, gates)| `.github/agents/maestro*`   |
+| 2     | Domain templates (steps + verbs)  | `tools/patterns/`           |
+| 3     | Repo context (concrete params)    | runtime, captured per run   |
 
-## meta-score/
+## tools/patterns/
 
-A standalone CLI that walks a problem through 8 prompt phases:
-`goal → constraints → classification → discovery → ordering →
-verify-hooks → score-emission → score-execution`.
+The curated library of algorithms. Each pattern is a TypeScript module exporting a `Pattern` value with two parts:
 
-- **Status:** legacy. Used as a fallback when `maestro` cannot reach
-  agreement with the user on an algorithm. Most flows now skip it.
-- **Type-name collision:** `meta-score.ts` exports `ScoreResult`, which
-  is unrelated to `symphony`'s `Score`. Rename pending (target #2 in
-  the cleanup investigation).
-- **Entry:** `tools/meta-score/cli.ts`.
+- `score: PatternScore` — the static, reusable skeleton (steps + level + instrument + directive). Authored once.
+- `requiredContext: string[]` — the keys the compiler must find on `Score.context` for an executable Score. Empty for `investigate`; `["target", "invariant"]` for `refactor`; `["scope", "contract"]` for `feature`.
 
-## symphony/
+Directives are static prose colocated with the beat. Repo-specific knobs travel through `context`, not via interpolation. List the library or render a single pattern as Markdown with:
 
-The runtime artifacts that `maestro` produces and consumes:
+```bash
+npx tsx tools/symphony/cli.ts list-patterns
+npx tsx tools/symphony/cli.ts pattern view --pattern investigate
+npx tsx tools/symphony/cli.ts pattern view --pattern refactor --out /tmp/refactor.md
+```
 
-| Type | Role |
-|------|------|
-| `Score` | A plan: `frequencyMap` + `tempo` + `beats[]` + ids |
-| `Beat` | One step: `{ level, voices[], directive }` |
-| `Voice` | One instrument's contribution to a beat |
-| `Performance` | The recording: per-beat `voices[].output` + `MoveVerdict` |
-| `FrequencyMap` | Mechanically derived from beats; level histogram |
-| `SavedRun` | `{ score, performance }` round-trippable on disk |
+The `.ts` module is the source of truth; `pattern view` regenerates a human-readable Markdown view on demand. There is no `.md → .ts` parser — round-trip is one-way.
 
-Pipeline: `parseAlgorithm(input) → Score`,
-then `performScore(score, executor) → Performance`.
+A pattern lives or dies on three things:
+- **Beats** — step + level + instrument + directive, 5–10 of them. Authored once, reused forever.
+- **`verbTriggers`** — phrases the maestro Setup phase scans for at routing time.
+- **`requiredContext`** — typed list of repo-specific keys the compiler refuses to compile without.
 
-- `parse.ts` — algorithm-text → Score (deterministic)
-- `perform.ts` — beat executor harness
-- `persistence.ts` — load/save SavedRun
-- `legality.ts` — sparse legality matrix for (level, instrument) pairs
-- `algorithms/` — base + local templates (feature, investigate, refactor)
-- `runs/` — saved investigations and their performances
-- `examples/` — handwritten Score builders for cross-checking the parser
-- `cli.ts` — `verify`, `parse`, `scaffold-performance`
+New patterns are authored by maestro on demand following the `draft-pattern` debate path; see `.github/agents/maestro.agent.md` step 1.2.
 
-`TempoConfig` is currently empty; see open question #2 below.
+## tools/compiler/
 
----
+Converts a Pattern + concrete inputs into an `ExecutableScore` (the per-problem deterministic plan).
 
-## When to use which
+Two entry points:
+- `compileScore(pattern, { problem, context })` — preferred. Pure function. Validates `context` against `pattern.requiredContext`, copies static directives from `pattern.score.beats`, hashes everything (including pattern name + context) into `ExecutableScore.id`.
+- `parseAlgorithm(input)` — low-level fallback. Used when the user-edited algorithm diverged from any pattern (extra steps, custom verbs).
 
-| You want to… | Go to |
-|--------------|-------|
-| Run `maestro` on a real problem | `symphony/` (parse + perform) |
-| Add a new algorithm template | `symphony/algorithms/{base,local}/` |
-| Fall back to the prompt-driven loop | `meta-score/` |
+`ExecutableScore.frequencyMap.levels` is derived from the beat histogram — the caller never authors amplitudes by hand.
 
-## Open architectural questions
+## tools/symphony/
 
-See `tools/symphony/runs/investigate-cleanup-targets/` for the full
-list. The remaining ones after the May 2026 cleanup:
+The runtime: types, persistence, beat legality, and the CLI.
 
-1. **Rename `meta-score.ScoreResult`** → `MetaScoreResult` to remove
-   the collision with `symphony.Score`.
-2. **`Tempo`**: delete the empty wrapper, or repopulate it with fields
-   a real executor will read.
-3. **Provenance cluster** (`computeScoreId`, `schemaVersion`,
-   `fingerprintProblem`, `generatedFrom`): keep for replay or drop
-   (gated on a reproducibility-policy decision, "Q0").
+```bash
+# Compile an ExecutableScore from a pattern + problem + context
+npx tsx tools/symphony/cli.ts from-pattern \
+  --pattern <name> \
+  --input   <input.json>     # { problem: string, context?: object }
+  --out     <score.json>
 
-## Cleanup history (May 2026)
+# Build an ExecutableScore from a hand-authored algorithm (fallback)
+npx tsx tools/symphony/cli.ts parse --input <a.json> --out <s.json>
 
-- Deleted `tools/symphony/heuristic.ts` (dead — superseded by
-  `parse.ts` deriving `FrequencyMap` mechanically).
-- Stripped `Conservatism` and `beatsPerMeasure` from `TempoConfig`
-  (no consumer read either field).
-- Deleted `tools/refactoring/` and `tools/symphony-core/` — a parallel
-  framework with the only consumer being its own tests. Resolved the
-  `MoveVerdict` name duplication and the parallel-vocabulary problem.
-- `tools/lib/` build output is no longer committed; only the source
-  files live in git.
+# Generate a skeleton Performance for an existing ExecutableScore
+npx tsx tools/symphony/cli.ts scaffold-performance --score <s.json> --out <p.json>
+
+# Persist a SavedRun (snapshot pattern + executable score + performance)
+npx tsx tools/symphony/cli.ts save-run \
+  --pattern     <name> \
+  --score       <score.json> \
+  --performance <performance.json>
+
+# Verify a SavedRun by file
+npx tsx tools/symphony/cli.ts verify --file <tools/scores/store/.../*.json>
+
+# Rebuild the score library index (pattern + outcome lookup)
+npx tsx tools/symphony/cli.ts library-index
+
+# Patterns
+npx tsx tools/symphony/cli.ts list-patterns
+npx tsx tools/symphony/cli.ts pattern view --pattern <name>
+```
+
+## tools/scores/
+
+The SavedRun store and its index — `tools/scores/` is **data**, never code that participates in the runtime path beyond reading/writing it.
+
+```text
+tools/scores/
+├── store/
+│   └── <patternName>/
+│       └── <fp16>-<timestamp>.json   # one SavedRun per file
+├── index.json                         # generated by `library-index`
+└── library.ts                         # the indexer
+```
+
+Each SavedRun JSON wraps three things:
+
+```jsonc
+{
+  "schemaVersion": 1,
+  "patternScore":      { /* snapshot of the static skeleton at compile time */ },
+  "executableScore":   { /* the compiled, executed plan */ },
+  "performance":       { /* the recording of what actually happened */ },
+  "problemFingerprint":"<canonical-hash>",
+  "timestamp":         "<iso-8601>"
+}
+```
+
+`patternScore` is a snapshot, not a reference: even if the pattern's TypeScript module is later edited, every old saved run still describes itself in full. That makes the store an audit log rather than a cache.
+
+## Build / verify
+
+```bash
+npm test                      # full jest suite
+npm run typecheck             # strict TS check across tools/
+```
+
+No build step is required at runtime — everything runs through `tsx`.

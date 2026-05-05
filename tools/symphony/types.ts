@@ -1,10 +1,9 @@
 /**
  * types.ts — Core types for the Symphony spectral orchestrator.
  *
- * Symphony is a parallel framework to meta-score. Where meta-score is a
- * sequential phase machine, Symphony decomposes a problem into a static
- * frequency spectrum (FrequencyMap) and then plans a path through that
- * spectrum (Score) which an orchestra of instrument-typed sub-agents
+ * Symphony decomposes a problem into a static frequency spectrum
+ * (FrequencyMap) and then plans a path through that spectrum
+ * (ExecutableScore) which an orchestra of instrument-typed sub-agents
  * performs. The Performance is a separate artifact recording what
  * actually happened during execution.
  *
@@ -131,15 +130,33 @@ export interface Beat {
   readonly directive: string;
 }
 
-export interface Score {
+export interface ExecutableScore {
   readonly schemaVersion: 1;
-  /** Deterministic id: hash of (frequencyMap + tempo + generatedFrom). */
+  /** Deterministic id: hash of (frequencyMap + tempo + beats + generatedFrom + pattern? + context?). */
   readonly id: string;
+  /**
+   * Derived from the beat histogram at compile time. Lives only on
+   * ExecutableScore — PatternScore is a skeleton and has no frequency
+   * profile of its own. Two compilations of the same pattern with
+   * different complexity scaling could produce different FrequencyMaps.
+   */
   readonly frequencyMap: FrequencyMap;
   readonly tempo: TempoConfig;
   readonly beats: readonly Beat[];
   readonly generatedAt: string;
   readonly generatedFrom: ProblemFingerprint;
+  /**
+   * Pattern provenance. Set when the Score was produced by `compileScore`
+   * from a Pattern; omitted for hand-authored Scores produced via the
+   * low-level `parseAlgorithm` fallback. Hashed into `id` only when present.
+   */
+  readonly pattern?: string;
+  /**
+   * Repo-specific context the compiler injected (target names, scope
+   * qualifiers, contracts, etc.). Validated against the Pattern's
+   * `requiredContext`. Hashed into `id` only when present.
+   */
+  readonly context?: Readonly<Record<string, unknown>>;
 }
 
 // ── Performance side: PerformedBeat / Performance ──────────────────
@@ -179,10 +196,23 @@ export interface Performance {
 }
 
 // ── Saved Run ──────────────────────────────────────────────────────
+// One file per execution under tools/scores/store/<pattern>/. Append-only.
+// `patternScore` is a snapshot taken at compile time: even if the
+// pattern's TypeScript module is later edited, every old saved run
+// still describes itself in full. That is what makes the store an
+// audit log rather than a cache.
 
 export interface SavedRun {
-  readonly score: Score;
+  readonly schemaVersion: 1;
+  /** Snapshot of the static skeleton at compile time. */
+  readonly patternScore: import("../patterns/types").PatternScore;
+  /** The compiled, executable Score that was actually performed. */
+  readonly executableScore: ExecutableScore;
   readonly performance: Performance;
+  /** Mirrors executableScore.generatedFrom.canonicalHash for fast lookup. */
+  readonly problemFingerprint: string;
+  /** Mirrors executableScore.generatedAt for filename + sort. */
+  readonly timestamp: string;
 }
 
 // ── Divergence Report ──────────────────────────────────────────────
@@ -223,9 +253,9 @@ export interface DivergenceReport {
 export type Legality = "legal" | "unusual" | "illegal";
 
 // ── Fallback Condition ─────────────────────────────────────────────
-// Named conditions under which Symphony refuses to generate a Score
-// and the caller should fall back to the meta-score phase machine
-// (or to direct execution, in the case of `pure-mechanical`).
+// Named conditions under which Symphony refuses to generate a Score.
+// The caller surfaces the condition to the user and re-iterates the
+// algorithm in maestro phase 2 (there is no separate fallback CLI).
 
 export type FallbackCondition =
   | { readonly reason: "no-dominant-levels"; readonly detail: string }

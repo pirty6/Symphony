@@ -18,7 +18,9 @@
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "fmt": "oxfmt",
-    "fmt:check": "oxfmt --check"
+    "fmt:check": "oxfmt --check",
+    "test": "jest --config tools/jest.config.js",
+    "typecheck": "tsc -p tools/tsconfig.typecheck.json"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
@@ -28,8 +30,5 @@
     "ts-jest": "^29.4.9",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3"
-  },
-  "bin": {
-    "meta-score": "./bin/meta-score"
   }
 }

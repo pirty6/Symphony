@@ -26,7 +26,7 @@ import type {
   PerformanceOutcome,
   PerformedBeat,
   PerformedVoice,
-  Score,
+  ExecutableScore,
 } from "./types";
 
 // ── Executor callback ──────────────────────────────────────────────
@@ -34,7 +34,7 @@ import type {
 export interface BeatExecutorContext {
   readonly beatIndex: number;
   readonly beat: Beat;
-  readonly score: Score;
+  readonly score: ExecutableScore;
   readonly previous: readonly PerformedBeat[];
 }
 
@@ -62,7 +62,7 @@ export type BeatExecutor = (
  *     (any 'failed' -> 'failed', else 'success'; all-null -> 'partial').
  */
 export async function performScore(
-  score: Score,
+  score: ExecutableScore,
   executeBeat: BeatExecutor,
   clock: () => string = () => new Date().toISOString(),
 ): Promise<Performance> {
@@ -109,7 +109,7 @@ export async function performScore(
  * fills the file directly. Outcome is 'in-progress'.
  */
 export function scaffoldPerformance(
-  score: Score,
+  score: ExecutableScore,
   clock: () => string = () => new Date().toISOString(),
 ): Performance {
   const beats: PerformedBeat[] = score.beats.map((beat, i) => ({

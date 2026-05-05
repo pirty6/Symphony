@@ -16,7 +16,7 @@
  * maestro's debate produces: steps and (verb, level, instrument) tuples.
  */
 
-import { fingerprintProblem, computeScoreId } from "./persistence";
+import { fingerprintProblem, computeExecutableScoreId } from "./persistence";
 import {
   DOMINANCE_THRESHOLD,
   LEVELS,
@@ -26,7 +26,7 @@ import {
   type FrequencyMap,
   type InstrumentType,
   type Level,
-  type Score,
+  type ExecutableScore,
   type Shape,
   type TempoConfig,
   type Voice,
@@ -98,7 +98,7 @@ function buildFrequencyMap(
  * references a verb not in the steps. Both are caller errors —
  * maestro's debate output should never produce mismatches.
  */
-export function parseAlgorithm(input: AlgorithmInput): Score {
+export function parseAlgorithm(input: AlgorithmInput): ExecutableScore {
   if (input.steps.length === 0) {
     throw new Error("parseAlgorithm: steps array is empty");
   }
@@ -144,14 +144,14 @@ export function parseAlgorithm(input: AlgorithmInput): Score {
   const frequencyMap = buildFrequencyMap(beats, input.domain, shape);
   const generatedFrom = fingerprintProblem(input.problem);
 
-  const partial: Omit<Score, "id" | "generatedAt"> = {
+  const partial: Omit<ExecutableScore, "id" | "generatedAt"> = {
     schemaVersion: 1,
     frequencyMap,
     tempo,
     beats,
     generatedFrom,
   };
-  const id = computeScoreId(partial);
+  const id = computeExecutableScoreId(partial);
   const generatedAt = input.generatedAt ?? new Date().toISOString();
 
   return { ...partial, id, generatedAt };

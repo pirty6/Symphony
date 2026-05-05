@@ -27,7 +27,7 @@ import type {
   PerformedBeat,
   ProblemFingerprint,
   SavedRun,
-  Score,
+  ExecutableScore,
   VerdictDelta,
 } from "./types";
 
@@ -52,51 +52,79 @@ export function fingerprintProblem(statement: string): ProblemFingerprint {
 /**
  * Compute a deterministic Score id from its content. Excludes
  * `id` and `generatedAt` so the id is stable across re-serializations.
+ *
+ * Optional fields (`pattern`, `context`) are hashed only when present, so
+ * pre-pattern saved runs retain their original ids.
  */
-export function computeScoreId(
-  score: Omit<Score, "id" | "generatedAt">,
+export function computeExecutableScoreId(
+  score: Omit<ExecutableScore, "id" | "generatedAt">,
 ): string {
-  const payload = JSON.stringify({
+  const base: Record<string, unknown> = {
     schemaVersion: score.schemaVersion,
     frequencyMap: score.frequencyMap,
     tempo: score.tempo,
     beats: score.beats,
     generatedFrom: score.generatedFrom,
-  });
-  return sha256(payload);
+  };
+  if (score.pattern !== undefined) base["pattern"] = score.pattern;
+  if (score.context !== undefined) base["context"] = score.context;
+  return sha256(JSON.stringify(base));
 }
 
 // ── IO ─────────────────────────────────────────────────────────────
+//
+// Storage layout (append-only):
+//   tools/scores/store/<patternName>/<problemFingerprint>-<timestamp>.json
+//
+// One JSON file per execution. Filename encodes the two natural keys
+// (problem + when), folder encodes the third (pattern). The full
+// SavedRun JSON wraps a snapshot of the PatternScore, the compiled
+// ExecutableScore, and the Performance — making each file
+// self-describing even after the pattern's TS module is later edited.
 
-const SCORE_FILE = "score.json";
-const PERFORMANCE_FILE = "performance.json";
+const STORE_DIR = path.join("tools", "scores", "store");
 
-/**
- * Persist a SavedRun to a directory. Writes two files:
- *   <dir>/score.json
- *   <dir>/performance.json
- * The directory is created if it does not exist.
- */
-export function saveRun(run: SavedRun, dir: string): void {
-  fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(
-    path.join(dir, SCORE_FILE),
-    JSON.stringify(run.score, null, 2) + "\n",
-    "utf8",
-  );
-  fs.writeFileSync(
-    path.join(dir, PERFORMANCE_FILE),
-    JSON.stringify(run.performance, null, 2) + "\n",
-    "utf8",
-  );
+function safeFingerprintSlice(fingerprint: string): string {
+  return fingerprint.slice(0, 16);
 }
 
-export function loadScore(filePath: string): Score {
+function safeTimestampSlug(timestamp: string): string {
+  return timestamp.replace(/[:.]/g, "-");
+}
+
+/**
+ * Build the canonical store path for a SavedRun. The pattern subfolder
+ * is created if it does not exist. Filename format:
+ *   <fp16>-<ts-with-dashes>.json
+ * fp16 is the first 16 hex chars of the problem fingerprint — enough
+ * to disambiguate manually-listed files without bloating the path.
+ */
+export function savedRunPath(run: SavedRun, root: string = STORE_DIR): string {
+  const patternName = run.patternScore.pattern;
+  const fp = safeFingerprintSlice(run.problemFingerprint);
+  const ts = safeTimestampSlug(run.timestamp);
+  return path.join(root, patternName, `${fp}-${ts}.json`);
+}
+
+/**
+ * Persist a SavedRun under tools/scores/store/<pattern>/. The whole
+ * SavedRun (snapshot + executable + performance) is written as a
+ * single JSON file; there are no separate score.json / performance.json
+ * files anymore.
+ */
+export function saveRun(run: SavedRun, root: string = STORE_DIR): string {
+  const file = savedRunPath(run, root);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify(run, null, 2) + "\n", "utf8");
+  return file;
+}
+
+export function loadExecutableScore(filePath: string): ExecutableScore {
   const raw = fs.readFileSync(filePath, "utf8");
-  const parsed = JSON.parse(raw) as Score;
+  const parsed = JSON.parse(raw) as ExecutableScore;
   if (parsed.schemaVersion !== 1) {
     throw new Error(
-      `unsupported Score schemaVersion: ${parsed.schemaVersion} (expected 1) at ${filePath}`,
+      `unsupported ExecutableScore schemaVersion: ${parsed.schemaVersion} (expected 1) at ${filePath}`,
     );
   }
   return parsed;
@@ -107,26 +135,37 @@ export function loadPerformance(filePath: string): Performance {
   return JSON.parse(raw) as Performance;
 }
 
-export function loadRun(dir: string): SavedRun {
-  const score = loadScore(path.join(dir, SCORE_FILE));
-  const performance = loadPerformance(path.join(dir, PERFORMANCE_FILE));
-  if (performance.scoreId !== score.id) {
+/**
+ * Load a SavedRun JSON file from the store. Validates the inner
+ * (executableScore.id, performance.scoreId, beatIndex) consistency
+ * the same way as before.
+ */
+export function loadRun(filePath: string): SavedRun {
+  const raw = fs.readFileSync(filePath, "utf8");
+  const run = JSON.parse(raw) as SavedRun;
+  if (run.schemaVersion !== 1) {
     throw new Error(
-      `Performance.scoreId ${performance.scoreId} does not match Score.id ${score.id}`,
+      `unsupported SavedRun schemaVersion: ${run.schemaVersion} (expected 1) at ${filePath}`,
     );
   }
-  // Consistency: PerformedBeat[i].beatIndex must equal i. This catches
-  // re-ordered or partially-reconstructed performances at load time
-  // rather than letting the divergence detector silently compare beats
-  // at mismatched positions.
-  performance.beats.forEach((b, i) => {
+  if (run.executableScore.schemaVersion !== 1) {
+    throw new Error(
+      `unsupported ExecutableScore schemaVersion: ${run.executableScore.schemaVersion} at ${filePath}`,
+    );
+  }
+  if (run.performance.scoreId !== run.executableScore.id) {
+    throw new Error(
+      `Performance.scoreId ${run.performance.scoreId} does not match ExecutableScore.id ${run.executableScore.id}`,
+    );
+  }
+  run.performance.beats.forEach((b, i) => {
     if (b.beatIndex !== i) {
       throw new Error(
         `Performance.beats[${i}].beatIndex=${b.beatIndex} (expected ${i})`,
       );
     }
   });
-  return { score, performance };
+  return run;
 }
 
 // ── Divergence ─────────────────────────────────────────────────────
