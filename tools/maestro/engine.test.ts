@@ -136,7 +136,9 @@ describe("confirm-fit", () => {
       reroute: "nonexistent-pattern",
     });
     expect(s1.kind).toBe("failed");
-    if (s1.kind === "failed") {expect(s1.error).toMatch(/reroute target/);}
+    if (s1.kind === "failed") {
+      expect(s1.error).toMatch(/reroute target/);
+    }
   });
 });
 
@@ -348,7 +350,9 @@ describe("perform-beat shape validation", () => {
     } as unknown as Resolution;
     const s1 = advance(s0, bad);
     expect(s1.kind).toBe("failed");
-    if (s1.kind === "failed") {expect(s1.error).toMatch(/voice/i);}
+    if (s1.kind === "failed") {
+      expect(s1.error).toMatch(/voice/i);
+    }
   });
 
   test("non-string output → engine fails", () => {
@@ -507,7 +511,9 @@ describe("pauseId idempotency", () => {
     // that forgot to echo pauseId.
     const s1 = advance(s0, { kind: "confirm-fit", ok: true } as unknown as Resolution);
     expect(s1.kind).toBe("failed");
-    if (s1.kind === "failed") {expect(s1.error).toMatch(/pauseId is required/);}
+    if (s1.kind === "failed") {
+      expect(s1.error).toMatch(/pauseId is required/);
+    }
   });
 
   test("stale pauseId (already-advanced state) fails the engine", () => {
@@ -530,7 +536,9 @@ describe("pauseId idempotency", () => {
       values: { target: "x", invariant: "y" },
     });
     expect(s2.kind).toBe("failed");
-    if (s2.kind === "failed") {expect(s2.error).toMatch(/pauseId mismatch/);}
+    if (s2.kind === "failed") {
+      expect(s2.error).toMatch(/pauseId mismatch/);
+    }
   });
 
   test("each pause has a fresh pauseId", () => {
@@ -613,7 +621,9 @@ describe("voiceOutputs.producedBy validation", () => {
     } as unknown as Resolution;
     const s1 = advance(s0, bad);
     expect(s1.kind).toBe("failed");
-    if (s1.kind === "failed") {expect(s1.error).toMatch(/producedBy/);}
+    if (s1.kind === "failed") {
+      expect(s1.error).toMatch(/producedBy/);
+    }
   });
 
   test("invalid producedBy value fails the engine", () => {
@@ -633,7 +643,9 @@ describe("voiceOutputs.producedBy validation", () => {
     } as unknown as Resolution;
     const s1 = advance(s0, bad);
     expect(s1.kind).toBe("failed");
-    if (s1.kind === "failed") {expect(s1.error).toMatch(/producedBy/);}
+    if (s1.kind === "failed") {
+      expect(s1.error).toMatch(/producedBy/);
+    }
   });
 
   test("producedBy persists onto PerformedVoice", () => {
@@ -698,7 +710,9 @@ describe("resolution kind mismatch", () => {
 describe("full run integration", () => {
   test("complete investigate run yields a shape-valid Performance", () => {
     const investigate = getPattern("investigate");
-    if (!investigate) {throw new Error("investigate pattern not found");}
+    if (!investigate) {
+      throw new Error("investigate pattern not found");
+    }
     const beats = investigate.score.beats.length;
 
     let state = createEngine({
