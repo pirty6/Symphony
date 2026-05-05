@@ -6,8 +6,6 @@ import type { Complexity } from "./types";
 export interface EngineConfig {
   readonly prompt: string;
   readonly patterns: readonly Pattern[];
-  /** Optional initial complexity classification for draft-pattern. Defaults to 2. */
-  readonly debateComplexityHint?: Complexity;
   /** Optional clock injector used for startedAt. */
   readonly clock?: () => string;
   /** Optional pauseId generator. Defaults to crypto.randomUUID. Tests inject a deterministic factory. */

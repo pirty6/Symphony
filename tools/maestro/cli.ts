@@ -37,7 +37,7 @@ import { composerPromptFor, instrumentPromptFor } from "./prompts";
 
 // ── IO helpers ─────────────────────────────────────────────────────
 
-function emitPauseAndExit(state: EngineState): never {
+function emitPauseAndExit(state: EngineState): void {
   if (state.kind !== "running") {
     process.stderr.write(`expected running state; got ${state.kind}\n`);
     process.exit(1);
@@ -60,7 +60,7 @@ function emitPauseAndExit(state: EngineState): never {
   process.exit(2);
 }
 
-function emitDoneAndExit(state: EngineState): never {
+function emitDoneAndExit(state: EngineState): void {
   if (state.kind !== "done") {
     process.stderr.write(`expected done state; got ${state.kind}\n`);
     process.exit(1);
@@ -91,7 +91,7 @@ function readState(file: string): EngineState {
 
 // ── Subcommand handlers ────────────────────────────────────────────
 
-function runStart(prompt: string, stateFile: string): never {
+function runStart(prompt: string, stateFile: string): void {
   const state = createEngine({ prompt, patterns: listPatterns() });
   if (state.kind === "failed") {
     process.stderr.write(`ENGINE ERROR: ${state.error}\n`);
@@ -104,7 +104,7 @@ function runStart(prompt: string, stateFile: string): never {
   emitDoneAndExit(state);
 }
 
-function runResolve(stateFile: string, resolutionRaw: string): never {
+function runResolve(stateFile: string, resolutionRaw: string): void {
   let resolution: Resolution;
   try {
     resolution = JSON.parse(resolutionRaw) as Resolution;

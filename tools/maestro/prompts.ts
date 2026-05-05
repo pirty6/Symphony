@@ -21,6 +21,8 @@ export function composerPromptFor(pause: Pause): string {
       return matchComposer(pause.payload.prompt, pause.payload.candidates);
     case "confirm-fit":
       return confirmComposer(pause.payload.pattern, pause.payload.matchedVerb);
+    case "classify-complexity":
+      return classifyComposer(pause.payload.prompt);
     case "draft-pattern-round":
       return draftComposer(pause.payload.round, pause.payload.complexity, pause.payload.priorDraft);
     case "elicit-context":
@@ -42,6 +44,8 @@ export function instrumentPromptFor(pause: Pause): string {
       return matchInstrument(pause.payload.candidates);
     case "confirm-fit":
       return confirmInstrument(pause.payload.pattern);
+    case "classify-complexity":
+      return classifyInstrument();
     case "draft-pattern-round":
       return draftInstrument(pause.payload.round, pause.payload.complexity);
     case "elicit-context":
@@ -86,6 +90,28 @@ function confirmComposer(pattern: string, matchedVerb: string): string {
 
 function confirmInstrument(pattern: string): string {
   return `Confirm pattern '${pattern}' or reroute.`;
+}
+
+function classifyComposer(prompt: string): string {
+  return [
+    "Classify the prompt's debate complexity for the draft-pattern phase.",
+    "",
+    `Prompt: ${prompt}`,
+    "",
+    "Tiers:",
+    "  1 — trivial. Proposer only.",
+    "  2 — standard. Proposer + skeptic.",
+    "  3 — high. Proposer + skeptic + pragmatist.",
+    "  4 — novel. Proposer + skeptic + pragmatist + template-critic.",
+    "",
+    "Pick the lowest tier that still covers the risk. Don't inflate.",
+    "",
+    "Reply with: { kind: 'classify-complexity', complexity: 1 | 2 | 3 | 4 }",
+  ].join("\n");
+}
+
+function classifyInstrument(): string {
+  return "Return one of: 1 (trivial), 2 (standard), 3 (high), 4 (novel).";
 }
 
 function draftComposer(round: number, complexity: Complexity, priorDraft: Pattern | null): string {

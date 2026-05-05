@@ -1,6 +1,7 @@
 import type { Pattern } from "../../patterns/types";
 import type { Beat } from "../../symphony/types";
 import type {
+  ClassifyComplexity,
   ConfirmFit,
   DraftPatternRound,
   ElicitContext,
@@ -37,6 +38,13 @@ type ConfirmFitPattern = BasePause & {
   readonly payload: {
     readonly pattern: string;
     readonly matchedVerb: string;
+  };
+};
+
+type ClassifyComplexityPause = BasePause & {
+  readonly kind: ClassifyComplexity;
+  readonly payload: {
+    readonly prompt: string;
   };
 };
 
@@ -87,6 +95,7 @@ type PerformBeatPause = BasePause & {
 export type Pause =
   | MatchPatternPause
   | ConfirmFitPattern
+  | ClassifyComplexityPause
   | DraftPatternRoundPause
   | ElicitContextPause
   | GoGatePause

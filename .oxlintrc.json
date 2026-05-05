@@ -28,6 +28,10 @@
     "no-param-reassign": "error",
     "object-shorthand": ["error", "always"],
     "no-implicit-coercion": ["error", { "allow": ["!!"] }],
+    "@typescript-eslint/no-restricted-types": [
+      "error",
+      { "types": { "never": { "message": "The `never` type is disallowed." } } }
+    ],
 
     "@typescript-eslint/no-unused-expressions": [
       "error",
@@ -47,7 +51,10 @@
     "@typescript-eslint/no-namespace": "error",
     "@typescript-eslint/no-misused-promises": ["error", { "checksVoidReturn": false }],
     "@typescript-eslint/no-this-alias": "error",
-    "@typescript-eslint/no-unnecessary-condition": ["error", { "allowConstantLoopConditions": true }],
+    "@typescript-eslint/no-unnecessary-condition": [
+      "error",
+      { "allowConstantLoopConditions": true }
+    ],
     "@typescript-eslint/no-unnecessary-type-assertion": "error",
     "@typescript-eslint/no-non-null-assertion": "error",
     "@typescript-eslint/await-thenable": "error",
@@ -55,7 +62,10 @@
     "@typescript-eslint/ban-tslint-comment": "error",
     "@typescript-eslint/only-throw-error": "error",
     "@typescript-eslint/prefer-optional-chain": "error",
-    "@typescript-eslint/switch-exhaustiveness-check": ["error", { "considerDefaultExhaustiveForUnions": true }],
+    "@typescript-eslint/switch-exhaustiveness-check": [
+      "error",
+      { "considerDefaultExhaustiveForUnions": true }
+    ],
     "@typescript-eslint/ban-ts-comment": [
       "error",
       {

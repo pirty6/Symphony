@@ -32,11 +32,7 @@ import {
 } from "./persistence";
 import { writeLibraryIndex } from "../scores/library";
 import { beatLegality } from "./legality";
-import {
-  parseAlgorithm,
-  compileScore,
-  type AlgorithmInput,
-} from "../compiler/compile";
+import { parseAlgorithm, compileScore, type AlgorithmInput } from "../compiler/compile";
 import { getPattern, listPatterns } from "../patterns";
 import { renderPatternMarkdown } from "../patterns/render";
 import { scaffoldPerformance } from "./perform";
@@ -68,7 +64,9 @@ function parseArgs(argv: readonly string[]): CliArgs {
   const flags = new Set<string>();
   for (let i = nextIdx; i < args.length; i += 1) {
     const arg = args[i];
-    if (!arg.startsWith("--")) {continue;}
+    if (!arg.startsWith("--")) {
+      continue;
+    }
     const eq = arg.indexOf("=");
     if (eq !== -1) {
       out[arg.substring(2, eq)] = arg.substring(eq + 1);
@@ -93,7 +91,7 @@ function parseArgs(argv: readonly string[]): CliArgs {
   };
 }
 
-function usage(): never {
+function usage() {
   process.stderr.write(
     [
       "Usage:",
@@ -123,7 +121,9 @@ function writeJson(file: string, value: unknown): void {
 
 function runFromPattern(args: CliArgs): number {
   const { pattern: patternName, input, out } = args;
-  if (!patternName || !input || !out) {usage();}
+  if (!patternName || !input || !out) {
+    usage();
+  }
   const pattern = getPattern(patternName);
   if (!pattern) {
     process.stderr.write(
@@ -165,7 +165,9 @@ function runFromPattern(args: CliArgs): number {
 
 function runParse(args: CliArgs): number {
   const { input, out } = args;
-  if (!input || !out) {usage();}
+  if (!input || !out) {
+    usage();
+  }
   let parsed: AlgorithmInput;
   try {
     parsed = readJson(input);
@@ -189,7 +191,9 @@ function runParse(args: CliArgs): number {
 
 function runScaffold(args: CliArgs): number {
   const { score: scoreFile, out } = args;
-  if (!scoreFile || !out) {usage();}
+  if (!scoreFile || !out) {
+    usage();
+  }
   let score: ExecutableScore;
   try {
     score = loadExecutableScore(scoreFile);
@@ -207,7 +211,9 @@ function runScaffold(args: CliArgs): number {
 
 function runSaveRun(args: CliArgs): number {
   const { pattern: patternName, score: scoreFile, performance: performanceFile } = args;
-  if (!patternName || !scoreFile || !performanceFile) {usage();}
+  if (!patternName || !scoreFile || !performanceFile) {
+    usage();
+  }
   const pattern = getPattern(patternName);
   if (!pattern) {
     process.stderr.write(`UNKNOWN PATTERN: ${patternName}\n`);
@@ -271,7 +277,9 @@ function validateScoreShape(score: ExecutableScore): string[] {
 
 function runVerify(args: CliArgs): number {
   const { file } = args;
-  if (!file) {usage();}
+  if (!file) {
+    usage();
+  }
   let run: SavedRun;
   try {
     run = loadRun(file);
@@ -282,7 +290,9 @@ function runVerify(args: CliArgs): number {
   const errors = validateScoreShape(run.executableScore);
   if (errors.length > 0) {
     process.stderr.write("SCORE VALIDATION ERRORS:\n");
-    for (const e of errors) {process.stderr.write(`  - ${e}\n`);}
+    for (const e of errors) {
+      process.stderr.write(`  - ${e}\n`);
+    }
     return 1;
   }
   process.stdout.write(
@@ -337,8 +347,7 @@ function runListPatterns(args: CliArgs): number {
   }
   process.stdout.write(`Available patterns (${patterns.length}):\n`);
   for (const p of patterns) {
-    const reqd =
-      p.requiredContext.length > 0 ? p.requiredContext.join(",") : "\u2014";
+    const reqd = p.requiredContext.length > 0 ? p.requiredContext.join(",") : "\u2014";
     process.stdout.write(
       `  ${p.score.pattern.padEnd(14)} domain=${p.score.domain.padEnd(16)} requiredContext=${reqd}\n`,
     );
@@ -350,8 +359,12 @@ function runListPatterns(args: CliArgs): number {
 }
 
 function runPatternView(args: CliArgs): number {
-  if (args.subcommand !== "view") {usage();}
-  if (!args.pattern) {usage();}
+  if (args.subcommand !== "view") {
+    usage();
+  }
+  if (!args.pattern) {
+    usage();
+  }
   const pattern = getPattern(args.pattern);
   if (!pattern) {
     process.stderr.write(`UNKNOWN PATTERN: ${args.pattern}\n`);

@@ -1,6 +1,7 @@
 import type { Pattern } from "../../patterns";
 import type { MoveVerdict } from "../../symphony/types";
 import type {
+  ClassifyComplexity,
   ConfirmFit,
   DraftPatternRound,
   ElicitContext,
@@ -9,7 +10,7 @@ import type {
   MatchPattern,
   PerformBeat,
 } from "./kind";
-import type { VoiceProducer } from "./types";
+import type { Complexity, VoiceProducer } from "./types";
 
 interface ResolutionBase {
   readonly kind: KindType;
@@ -38,6 +39,11 @@ type DraftPatternRoundResolution = ResolutionBase & {
   readonly nextDraft?: Pattern;
 };
 
+type ClassifyComplexityResolution = ResolutionBase & {
+  readonly kind: ClassifyComplexity;
+  readonly complexity: Complexity;
+};
+
 type GoGateResolution = ResolutionBase & {
   readonly kind: GoGate;
   readonly phrase: string;
@@ -64,6 +70,7 @@ export type Resolution =
   | MatchPatternResolution
   | ConfirmFitResolution
   | ElicitContextResolution
+  | ClassifyComplexityResolution
   | DraftPatternRoundResolution
   | GoGateResolution
   | PerformBeatResolution;

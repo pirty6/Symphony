@@ -39,6 +39,7 @@ import type { Pause, PatternSummary } from "./types/pause";
 import type { Resolution } from "./types/resolution";
 import type { Complexity, VoiceProducer } from "./types/types";
 import type { EngineConfig, EngineState, InternalState } from "./types/engine";
+import { defaultClock, defaultPauseIdFactory } from "./utils";
 
 // ── Public types ────────────────────────────────────────────────────
 
@@ -59,27 +60,23 @@ export function createEngine(config: EngineConfig): EngineState {
   const clock = config.clock ?? defaultClock;
   const newPauseId = config.pauseIdFactory ?? defaultPauseIdFactory;
   const prompt = config.prompt;
-  const candidates = matchVerbs(prompt, config.patterns);
 
+  // The engine's first pause is always classify-complexity. The hint
+  // here is a placeholder: resolveClassifyComplexity will overwrite
+  // it with the agent's classification before any reader observes it.
   const internal: InternalState = {
     prompt,
     patterns: config.patterns,
     active: null,
     context: {},
     draftRound: 0,
-    debateComplexityHint: config.debateComplexityHint ?? 2,
+    debateComplexityHint: 2,
     score: null,
     performedBeats: [],
     startedAt: clock(),
   };
 
-  if (candidates.length === 1) {
-    return enterConfirmFit(internal, candidates[0], newPauseId);
-  }
-  if (candidates.length > 1) {
-    return runningPause(internal, makeMatchPatternPause(prompt, candidates, newPauseId));
-  }
-  return enterDraftPatternRound(internal, 1, null, newPauseId);
+  return enterClassifyComplexity(internal, newPauseId);
 }
 
 // ── Reducer ────────────────────────────────────────────────────────
@@ -125,6 +122,8 @@ export function advance(
       return resolveMatchPattern(internal, resolution as MatchRes, newPauseId);
     case "confirm-fit":
       return resolveConfirmFit(internal, resolution as ConfirmRes, newPauseId);
+    case "classify-complexity":
+      return resolveClassifyComplexity(internal, resolution as ClassifyRes, newPauseId);
     case "draft-pattern-round":
       return resolveDraftRound(internal, resolution as DraftRes, pause, newPauseId);
     case "elicit-context":
@@ -140,6 +139,7 @@ export function advance(
 
 type MatchRes = Extract<Resolution, { kind: "match-pattern" }>;
 type ConfirmRes = Extract<Resolution, { kind: "confirm-fit" }>;
+type ClassifyRes = Extract<Resolution, { kind: "classify-complexity" }>;
 type DraftRes = Extract<Resolution, { kind: "draft-pattern-round" }>;
 type ElicitRes = Extract<Resolution, { kind: "elicit-context" }>;
 type GoRes = Extract<Resolution, { kind: "go-gate" }>;
@@ -317,7 +317,9 @@ function resolvePerformBeat(
   if (verdictError) {
     return failed(`perform-beat[${pause.payload.beatIndex}]: ${verdictError}`);
   }
-  if (!internal.score) {return failed("perform-beat: no compiled score");}
+  if (!internal.score) {
+    return failed("perform-beat: no compiled score");
+  }
 
   const performed: PerformedBeat = {
     beatIndex: pause.payload.beatIndex,
@@ -359,7 +361,9 @@ function enterConfirmFit(
   nid: () => string,
 ): EngineState {
   const target = findPattern(internal.patterns, summary.pattern);
-  if (!target) {return failed(`confirm-fit: pattern '${summary.pattern}' not registered`);}
+  if (!target) {
+    return failed(`confirm-fit: pattern '${summary.pattern}' not registered`);
+  }
   const next: InternalState = {
     ...internal,
     active: { patternName: target.score.pattern, matchedVerb: summary.matchedVerb },
@@ -374,9 +378,13 @@ function enterConfirmFit(
 }
 
 function enterAfterConfirmFit(internal: InternalState, nid: () => string): EngineState {
-  if (!internal.active) {return failed("after-confirm-fit: no active pattern");}
+  if (!internal.active) {
+    return failed("after-confirm-fit: no active pattern");
+  }
   const activePattern = findPattern(internal.patterns, internal.active.patternName);
-  if (!activePattern) {return failed("after-confirm-fit: active pattern not registered");}
+  if (!activePattern) {
+    return failed("after-confirm-fit: active pattern not registered");
+  }
   const required = activePattern.requiredContext;
   if (required.length === 0) {
     return enterGoGate(internal, nid);
@@ -407,10 +415,46 @@ function enterDraftPatternRound(
   });
 }
 
+function enterClassifyComplexity(internal: InternalState, nid: () => string): EngineState {
+  return runningPause(internal, {
+    kind: "classify-complexity",
+    pauseId: nid(),
+    payload: { prompt: internal.prompt },
+    composerPrompt: composerForClassify(internal.prompt),
+    instrumentPrompt: instrumentForClassify(),
+  });
+}
+
+function resolveClassifyComplexity(
+  internal: InternalState,
+  res: ClassifyRes,
+  nid: () => string,
+): EngineState {
+  if (![1, 2, 3, 4].includes(res.complexity)) {
+    return failed(
+      `classify-complexity: complexity must be 1|2|3|4 (got ${String(res.complexity)})`,
+    );
+  }
+  const next: InternalState = { ...internal, debateComplexityHint: res.complexity };
+  // Now route by verb-match against the registered patterns.
+  const candidates = matchVerbs(next.prompt, next.patterns);
+  if (candidates.length === 1) {
+    return enterConfirmFit(next, candidates[0], nid);
+  }
+  if (candidates.length > 1) {
+    return runningPause(next, makeMatchPatternPause(next.prompt, candidates, nid));
+  }
+  return enterDraftPatternRound(next, 1, null, nid);
+}
+
 function enterGoGate(internal: InternalState, nid: () => string): EngineState {
-  if (!internal.active) {return failed("go-gate: no active pattern");}
+  if (!internal.active) {
+    return failed("go-gate: no active pattern");
+  }
   const activePattern = findPattern(internal.patterns, internal.active.patternName);
-  if (!activePattern) {return failed("go-gate: active pattern not registered");}
+  if (!activePattern) {
+    return failed("go-gate: active pattern not registered");
+  }
   return runningPause(internal, makeGoGatePause(activePattern, internal.context, nid));
 }
 
@@ -419,9 +463,13 @@ function enterPerformBeat(
   beatIndex: number,
   nid: () => string,
 ): EngineState {
-  if (!internal.score) {return failed("perform-beat: no compiled score");}
+  if (!internal.score) {
+    return failed("perform-beat: no compiled score");
+  }
   const beat = internal.score.beats[beatIndex];
-  if (!beat) {return failed(`perform-beat: out-of-range index ${beatIndex}`);}
+  if (!beat) {
+    return failed(`perform-beat: out-of-range index ${beatIndex}`);
+  }
   const previousOutputs = internal.performedBeats.map((b) =>
     b.voices.map((v) => v.output).join("\n"),
   );
@@ -439,7 +487,9 @@ function finishRun(
   terminatedEarly: boolean,
   clock: () => string,
 ): EngineState {
-  if (!internal.score) {return failed("finish-run: no compiled score");}
+  if (!internal.score) {
+    return failed("finish-run: no compiled score");
+  }
   const performance: Performance = {
     scoreId: internal.score.id,
     beats: internal.performedBeats,
@@ -541,14 +591,18 @@ function validateVoiceOutputs(outputs: PerformRes["voiceOutputs"], beat: Beat): 
 }
 
 function validateVerdict(v: MoveVerdict): string | null {
-  if (!v) {return "verdict required";}
+  if (!v) {
+    return "verdict required";
+  }
   if (!["applied", "failed", "skipped"].includes(v.outcome)) {
     return `verdict.outcome invalid: ${String(v.outcome)}`;
   }
   if (typeof v.confidence !== "number" || v.confidence < 0 || v.confidence > 1) {
     return "verdict.confidence must be a number in [0,1]";
   }
-  if (typeof v.reason !== "string") {return "verdict.reason must be a string";}
+  if (typeof v.reason !== "string") {
+    return "verdict.reason must be a string";
+  }
   if (typeof v.shouldTerminate !== "boolean") {
     return "verdict.shouldTerminate must be boolean";
   }
@@ -566,7 +620,9 @@ function bestVerbFor(prompt: string, pattern: Pattern): string | null {
   let best: string | null = null;
   for (const verb of pattern.verbTriggers) {
     if (lower.includes(verb.toLowerCase())) {
-      if (!best || verb.length > best.length) {best = verb;}
+      if (!best || verb.length > best.length) {
+        best = verb;
+      }
     }
   }
   return best;
@@ -576,7 +632,9 @@ function matchVerbs(prompt: string, patterns: readonly Pattern[]): readonly Patt
   const hits: PatternSummary[] = [];
   for (const p of patterns) {
     const verb = bestVerbFor(prompt, p);
-    if (verb) {hits.push({ pattern: p.score.pattern, matchedVerb: verb });}
+    if (verb) {
+      hits.push({ pattern: p.score.pattern, matchedVerb: verb });
+    }
   }
   return hits;
 }
@@ -593,21 +651,17 @@ function deriveOutcome(
   beats: readonly PerformedBeat[],
   terminatedEarly: boolean,
 ): Performance["outcome"] {
-  if (beats.length === 0) {return "in-progress";}
-  if (beats.some((b) => b.verdict?.outcome === "failed")) {return "failed";}
+  if (beats.length === 0) {
+    return "in-progress";
+  }
+  if (beats.some((b) => b.verdict?.outcome === "failed")) {
+    return "failed";
+  }
   if (terminatedEarly) {
     const last = beats[beats.length - 1].verdict;
     return last?.outcome === "applied" ? "success" : "partial";
   }
   return "success";
-}
-
-function defaultClock(): string {
-  return new Date().toISOString();
-}
-
-function defaultPauseIdFactory(): string {
-  return crypto.randomUUID();
 }
 
 function stateHashFor(scoreId: string, beatIndex: number): string {
@@ -654,6 +708,23 @@ function instrumentForDraft(
   return `Round ${round}; complexity ${complexity}. Spawn proposer${
     complexity >= 2 ? " + skeptic" : ""
   }${complexity >= 3 ? " + pragmatist" : ""}${complexity >= 4 ? " + template-critic" : ""}.`;
+}
+
+function composerForClassify(prompt: string): string {
+  return [
+    `Classify the user's prompt by complexity (1|2|3|4) for the draft-pattern debate.`,
+    `  1 = trivial (proposer only)`,
+    `  2 = standard (proposer + skeptic)`,
+    `  3 = high (proposer + skeptic + pragmatist)`,
+    `  4 = novel (proposer + skeptic + pragmatist + template-critic)`,
+    ``,
+    `Prompt: ${prompt}`,
+    ``,
+    `Reply with: { kind: 'classify-complexity', complexity: 1|2|3|4 }`,
+  ].join("\n");
+}
+function instrumentForClassify(): string {
+  return `Reply with complexity 1, 2, 3, or 4 based on the prompt's novelty and risk.`;
 }
 
 function composerForElicit(
