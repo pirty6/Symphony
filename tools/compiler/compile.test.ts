@@ -8,7 +8,7 @@
 
 import { compileScore, parseAlgorithm, type AlgorithmInput } from "./compile";
 import { investigatePattern, refactorPattern, featurePattern } from "../patterns";
-import { DOMINANCE_THRESHOLD } from "../symphony/types";
+import { LEVEL_ACTIVITY_THRESHOLD, LEVELS } from "../symphony/types";
 
 const FIXED_TS = "2026-01-01T00:00:00.000Z";
 
@@ -42,12 +42,14 @@ describe("compileScore", () => {
       acc[b.level] = (acc[b.level] ?? 0) + 1;
       return acc;
     }, {});
-    for (let lvl = 1; lvl <= 8; lvl++) {
-      const expected = total === 0 ? 0 : (counts[lvl] ?? 0) / total;
-      expect(score.frequencyMap.levels[lvl as 1]).toBeCloseTo(expected);
+    for (const lvl of score.frequencyMap.activeLevels) {
+      const share = total === 0 ? 0 : (counts[lvl] ?? 0) / total;
+      expect(share).toBeGreaterThanOrEqual(LEVEL_ACTIVITY_THRESHOLD);
     }
-    for (const lvl of score.frequencyMap.dominantLevels) {
-      expect(score.frequencyMap.levels[lvl]).toBeGreaterThanOrEqual(DOMINANCE_THRESHOLD);
+    for (const lvl of LEVELS) {
+      const share = total === 0 ? 0 : (counts[lvl] ?? 0) / total;
+      const isActive = score.frequencyMap.activeLevels.includes(lvl);
+      expect(isActive).toBe(share >= LEVEL_ACTIVITY_THRESHOLD);
     }
   });
 

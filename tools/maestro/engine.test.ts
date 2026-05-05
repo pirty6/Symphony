@@ -242,8 +242,6 @@ describe("draft-pattern MAX_ROUNDS", () => {
       score: {
         pattern: name,
         domain: "feature",
-        defaultComplexity: 2,
-        defaultShape: "layered",
         beats: [
           {
             step: "stub",
@@ -445,7 +443,7 @@ describe("debateComplexityHint", () => {
       patterns: allPatterns,
     });
     const pause = expectPause(s0, "draft-pattern-round");
-    expect(pause.payload.debateComplexity).toBe(2);
+    expect(pause.payload.complexity).toBe(2);
   });
 
   test("hint=4 makes round 1 complexity 4 (capped)", () => {
@@ -455,7 +453,7 @@ describe("debateComplexityHint", () => {
       debateComplexityHint: 4,
     });
     const pause = expectPause(s0, "draft-pattern-round");
-    expect(pause.payload.debateComplexity).toBe(4);
+    expect(pause.payload.complexity).toBe(4);
   });
 
   test("hint=1 starts at 1 and escalates each round, capped at 4", () => {
@@ -467,7 +465,7 @@ describe("debateComplexityHint", () => {
     const seen: number[] = [];
     for (let i = 0; i < 6; i++) {
       const pause = expectPause(state, "draft-pattern-round");
-      seen.push(pause.payload.debateComplexity);
+      seen.push(pause.payload.complexity);
       state = advance(state, { kind: "draft-pattern-round", pauseId: pid(state), outcome: "edit" });
     }
     expect(seen).toEqual([1, 2, 3, 4, 4, 4]);

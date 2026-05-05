@@ -35,111 +35,23 @@ import type {
 import { INSTRUMENTS } from "../symphony/types";
 import { compileScore } from "../compiler/compile";
 import { scaffoldPerformance } from "../symphony/perform";
-import { Pause, type Complexity, type PatternSummary } from "./types/pause";
-export { type Complexity, type PatternSummary } from "./types/pause";
+import type { Pause, PatternSummary } from "./types/pause";
+import type { Resolution } from "./types/resolution";
+import type { Complexity, VoiceProducer } from "./types/types";
+import type { EngineConfig, EngineState, InternalState } from "./types/engine";
 
 // ── Public types ────────────────────────────────────────────────────
 
-export const MAESTRO_GO_PHRASES = [
-  "go",
-  "approved",
-  "looks good",
-  "ship it",
-  "proceed",
-] as const;
+export const MAESTRO_GO_PHRASES = ["go", "approved", "looks good", "ship it", "proceed"] as const;
 
 export const MAESTRO_DRAFT_MAX_ROUNDS = 6;
-
-/** Producer of a voice output. Composer must declare which sub-agent ran. */
-export type VoiceProducer = "maestro-assessor" | "maestro-executor";
 
 export const VOICE_PRODUCERS: readonly VoiceProducer[] = [
   "maestro-assessor",
   "maestro-executor",
 ] as const;
 
-/**
- * Every Resolution carries the pauseId of the Pause it answers. The
- * engine rejects any Resolution whose pauseId does not match the
- * current running state's pauseId — including resubmissions of the
- * same Resolution after the state has already advanced.
- */
-export type Resolution =
-  | {
-      readonly kind: "match-pattern";
-      readonly pauseId: string;
-      readonly chosen: string | "no-match";
-    }
-  | {
-      readonly kind: "confirm-fit";
-      readonly pauseId: string;
-      readonly ok: boolean;
-      readonly reroute?: string;
-    }
-  | {
-      readonly kind: "draft-pattern-round";
-      readonly pauseId: string;
-      readonly outcome: "approve" | "edit" | "ambiguous";
-      readonly nextDraft?: Pattern;
-    }
-  | {
-      readonly kind: "elicit-context";
-      readonly pauseId: string;
-      readonly values: Readonly<Record<string, string>>;
-    }
-  | { readonly kind: "go-gate"; readonly pauseId: string; readonly phrase: string }
-  | {
-      readonly kind: "perform-beat";
-      readonly pauseId: string;
-      readonly voiceOutputs: readonly {
-        readonly instrument: string;
-        readonly output: string;
-        readonly confidence: number;
-        readonly producedBy: VoiceProducer;
-      }[];
-      readonly verdict: MoveVerdict;
-    };
-
-export interface EngineConfig {
-  readonly prompt: string;
-  readonly patterns: readonly Pattern[];
-  /** Optional initial complexity classification for draft-pattern. Defaults to 2. */
-  readonly debateComplexityHint?: Complexity;
-  /** Optional clock injector used for startedAt. */
-  readonly clock?: () => string;
-  /** Optional pauseId generator. Defaults to crypto.randomUUID. Tests inject a deterministic factory. */
-  readonly pauseIdFactory?: () => string;
-}
-
-export interface EngineResult {
-  readonly executableScore: ExecutableScore;
-  readonly performance: Performance;
-}
-
-export type EngineState =
-  | {
-      readonly kind: "running";
-      readonly pause: Pause;
-      readonly internal: InternalState;
-    }
-  | { readonly kind: "done"; readonly result: EngineResult }
-  | { readonly kind: "failed"; readonly error: string };
-
 // ── Internal state (data-only; JSON-round-trippable) ───────────────
-
-export interface InternalState {
-  readonly prompt: string;
-  /** Static + drafted patterns, all carried as data. */
-  readonly patterns: readonly Pattern[];
-  /** Active pattern is referenced by name; resolve via patterns[]. */
-  readonly active: { readonly patternName: string; readonly matchedVerb: string } | null;
-  readonly context: Readonly<Record<string, string>>;
-  readonly draftRound: number;
-  readonly debateComplexityHint: Complexity;
-  readonly score: ExecutableScore | null;
-  readonly performedBeats: readonly PerformedBeat[];
-  readonly startedAt: string;
-}
 
 // ── Factory ────────────────────────────────────────────────────────
 
@@ -190,9 +102,7 @@ export function advance(
   const newPauseId = opts.pauseIdFactory ?? defaultPauseIdFactory;
 
   if (pause.kind !== resolution.kind) {
-    return failed(
-      `resolution kind '${resolution.kind}' does not match pause '${pause.kind}'`,
-    );
+    return failed(`resolution kind '${resolution.kind}' does not match pause '${pause.kind}'`);
   }
 
   // Idempotency guard: every Resolution must echo the current Pause's
@@ -200,9 +110,7 @@ export function advance(
   // a stale resolution from a prior turn) is rejected here, not
   // silently accepted as a fresh transition.
   if (typeof resolution.pauseId !== "string" || resolution.pauseId === "") {
-    return failed(
-      `${pause.kind}: resolution.pauseId is required (expected '${pause.pauseId}')`,
-    );
+    return failed(`${pause.kind}: resolution.pauseId is required (expected '${pause.pauseId}')`);
   }
   if (resolution.pauseId !== pause.pauseId) {
     return failed(
@@ -319,16 +227,9 @@ function resolveDraftRound(
   // edit / ambiguous → next round (cap enforced in code).
   const next = pause.payload.round + 1;
   if (next > MAESTRO_DRAFT_MAX_ROUNDS) {
-    return failed(
-      `draft-pattern: MAX_ROUNDS=${MAESTRO_DRAFT_MAX_ROUNDS} exceeded`,
-    );
+    return failed(`draft-pattern: MAX_ROUNDS=${MAESTRO_DRAFT_MAX_ROUNDS} exceeded`);
   }
-  return enterDraftPatternRound(
-    internal,
-    next,
-    res.nextDraft ?? pause.payload.priorDraft,
-    nid,
-  );
+  return enterDraftPatternRound(internal, next, res.nextDraft ?? pause.payload.priorDraft, nid);
 }
 
 // ── Phase 2 transitions ────────────────────────────────────────────
@@ -471,10 +372,7 @@ function enterAfterConfirmFit(internal: InternalState, nid: () => string): Engin
     return enterGoGate(internal, nid);
   }
   const missing = required.filter((k) => !internal.context[k]);
-  return runningPause(
-    internal,
-    makeElicitPause(activePattern, internal.context, missing, nid),
-  );
+  return runningPause(internal, makeElicitPause(activePattern, internal.context, missing, nid));
 }
 
 function enterDraftPatternRound(
@@ -503,10 +401,7 @@ function enterGoGate(internal: InternalState, nid: () => string): EngineState {
   if (!internal.active) return failed("go-gate: no active pattern");
   const activePattern = findPattern(internal.patterns, internal.active.patternName);
   if (!activePattern) return failed("go-gate: active pattern not registered");
-  return runningPause(
-    internal,
-    makeGoGatePause(activePattern, internal.context, nid),
-  );
+  return runningPause(internal, makeGoGatePause(activePattern, internal.context, nid));
 }
 
 function enterPerformBeat(
@@ -599,10 +494,7 @@ function makeGoGatePause(
 
 // ── Validation ─────────────────────────────────────────────────────
 
-function validateVoiceOutputs(
-  outputs: PerformRes["voiceOutputs"],
-  beat: Beat,
-): string | null {
+function validateVoiceOutputs(outputs: PerformRes["voiceOutputs"], beat: Beat): string | null {
   if (!Array.isArray(outputs) || outputs.length === 0) {
     return "voiceOutputs must be a non-empty array";
   }
@@ -655,10 +547,7 @@ function validateVerdict(v: MoveVerdict): string | null {
 
 // ── Derivations ────────────────────────────────────────────────────
 
-function findPattern(
-  patterns: readonly Pattern[],
-  name: string,
-): Pattern | undefined {
+function findPattern(patterns: readonly Pattern[], name: string): Pattern | undefined {
   return patterns.find((p) => p.score.pattern === name);
 }
 
@@ -673,10 +562,7 @@ function bestVerbFor(prompt: string, pattern: Pattern): string | null {
   return best;
 }
 
-function matchVerbs(
-  prompt: string,
-  patterns: readonly Pattern[],
-): readonly PatternSummary[] {
+function matchVerbs(prompt: string, patterns: readonly Pattern[]): readonly PatternSummary[] {
   const hits: PatternSummary[] = [];
   for (const p of patterns) {
     const verb = bestVerbFor(prompt, p);
@@ -685,10 +571,7 @@ function matchVerbs(
   return hits;
 }
 
-function pickDebateComplexity(
-  round: number,
-  hint: Complexity,
-): Complexity {
+function pickDebateComplexity(round: number, hint: Complexity): Complexity {
   // Round 1 honors the caller's classification. Subsequent rounds may
   // escalate one tier per round, capped at 4. This keeps the doc's
   // "classify up-front" intent while allowing escalation on stalls.
@@ -718,10 +601,7 @@ function defaultPauseIdFactory(): string {
 }
 
 function stateHashFor(scoreId: string, beatIndex: number): string {
-  return crypto
-    .createHash("sha256")
-    .update(`engine:${scoreId}:${beatIndex}`)
-    .digest("hex");
+  return crypto.createHash("sha256").update(`engine:${scoreId}:${beatIndex}`).digest("hex");
 }
 
 // ── Prompt builders (terse defaults; richer text in prompts.ts) ────
@@ -753,9 +633,7 @@ function composerForDraft(
   return [
     `Draft-pattern round ${round}/${MAESTRO_DRAFT_MAX_ROUNDS} (complexity ${complexity}).`,
     "Run the debate sub-agents and synthesize a draft Pattern.",
-    priorDraft
-      ? `Prior draft existed; iterate.`
-      : `No prior draft; propose from scratch.`,
+    priorDraft ? `Prior draft existed; iterate.` : `No prior draft; propose from scratch.`,
   ].join("\n");
 }
 function instrumentForDraft(
@@ -765,9 +643,7 @@ function instrumentForDraft(
 ): string {
   return `Round ${round}; complexity ${complexity}. Spawn proposer${
     complexity >= 2 ? " + skeptic" : ""
-  }${complexity >= 3 ? " + pragmatist" : ""}${
-    complexity >= 4 ? " + template-critic" : ""
-  }.`;
+  }${complexity >= 3 ? " + pragmatist" : ""}${complexity >= 4 ? " + template-critic" : ""}.`;
 }
 
 function composerForElicit(
@@ -789,10 +665,7 @@ function instrumentForElicit(
   return `Reply with values for: ${missing.join(", ")}. Empty/whitespace will not advance.`;
 }
 
-function composerForGoGate(
-  pattern: Pattern,
-  context: Readonly<Record<string, string>>,
-): string {
+function composerForGoGate(pattern: Pattern, context: Readonly<Record<string, string>>): string {
   return [
     `Ready to compile and execute pattern '${pattern.score.pattern}'.`,
     `beats: ${pattern.score.beats.length}`,

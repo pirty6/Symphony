@@ -1,15 +1,15 @@
 import type { Pattern } from "../../patterns/types";
-import type { Beat } from '../../symphony/types';
-
-type MatchPattern = 'match-pattern';
-type ConfirmFit = 'confirm-fit';
-type DraftPatternRound = 'draft-pattern-round';
-type ElicitContext = 'elicit-context';
-type GoGate = 'go-gate';
-type PerformBeat = 'perform-beat';
-
-
-type KindType = MatchPattern| ConfirmFit | DraftPatternRound | ElicitContext | GoGate | PerformBeat ;
+import type { Beat } from "../../symphony/types";
+import type {
+  ConfirmFit,
+  DraftPatternRound,
+  ElicitContext,
+  GoGate,
+  KindType,
+  MatchPattern,
+  PerformBeat,
+} from "./kind";
+import type { Complexity } from "./types";
 
 interface BasePause {
   readonly kind: KindType;
@@ -29,18 +29,16 @@ type MatchPatternPause = BasePause & {
   readonly payload: {
     readonly prompt: string;
     readonly candidates: readonly PatternSummary[];
-  }
-}
+  };
+};
 
 type ConfirmFitPattern = BasePause & {
   readonly kind: ConfirmFit;
   readonly payload: {
-    readonly pattern: string; 
-    readonly matchedVerb: string
-  }
-}
-
-export type Complexity = 1 | 2 | 3 | 4;
+    readonly pattern: string;
+    readonly matchedVerb: string;
+  };
+};
 
 type DraftPatternRoundPause = BasePause & {
   readonly kind: DraftPatternRound;
@@ -49,17 +47,17 @@ type DraftPatternRoundPause = BasePause & {
     readonly maxRounds: number;
     readonly complexity: Complexity;
     readonly priorDraft: Pattern | null;
-  }
-}
+  };
+};
 
 type ElicitContextPause = BasePause & {
   readonly kind: ElicitContext;
   readonly payload: {
-  readonly pattern: string;
+    readonly pattern: string;
     readonly missingKeys: readonly string[];
     readonly collected: Readonly<Record<string, string>>;
-  }
-}
+  };
+};
 
 type GoGatePause = BasePause & {
   readonly kind: GoGate;
@@ -67,8 +65,8 @@ type GoGatePause = BasePause & {
     readonly pattern: string;
     readonly context: Readonly<Record<string, string>>;
     readonly beats: number;
-  }
-}
+  };
+};
 
 type PerformBeatPause = BasePause & {
   readonly kind: PerformBeat;
@@ -76,8 +74,8 @@ type PerformBeatPause = BasePause & {
     readonly beatIndex: number;
     readonly beat: Beat;
     readonly previousOutputs: readonly string[];
-  }
-}
+  };
+};
 
 /**
  * Every Pause carries a unique opaque token. The next Resolution must
@@ -86,4 +84,10 @@ type PerformBeatPause = BasePause & {
  * already-consumed state is no longer silently accepted as a fresh
  * transition.
  */
-export type Pause = MatchPatternPause | ConfirmFitPattern | DraftPatternRoundPause | ElicitContextPause | GoGatePause | PerformBeatPause;
+export type Pause =
+  | MatchPatternPause
+  | ConfirmFitPattern
+  | DraftPatternRoundPause
+  | ElicitContextPause
+  | GoGatePause
+  | PerformBeatPause;

@@ -22,7 +22,7 @@ export function composerPromptFor(pause: Pause): string {
     case "draft-pattern-round":
       return draftComposer(
         pause.payload.round,
-        pause.payload.debateComplexity,
+        pause.payload.complexity,
         pause.payload.priorDraft,
       );
     case "elicit-context":
@@ -49,7 +49,7 @@ export function instrumentPromptFor(pause: Pause): string {
     case "confirm-fit":
       return confirmInstrument(pause.payload.pattern);
     case "draft-pattern-round":
-      return draftInstrument(pause.payload.round, pause.payload.debateComplexity);
+      return draftInstrument(pause.payload.round, pause.payload.complexity);
     case "elicit-context":
       return elicitInstrument(pause.payload.missingKeys);
     case "go-gate":
