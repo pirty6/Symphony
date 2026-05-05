@@ -1,0 +1,194 @@
+/**
+ * compile.test.ts — compileScore + parseAlgorithm.
+ *
+ * Covers the deterministic shape conversion at the heart of Symphony:
+ * required-context validation, directive copy-through, frequencyMap
+ * derivation, deterministic id, and parseAlgorithm error paths.
+ */
+
+import { compileScore, parseAlgorithm, type AlgorithmInput } from "./compile";
+import { investigatePattern, refactorPattern, featurePattern } from "../patterns";
+import { DOMINANCE_THRESHOLD } from "../symphony/types";
+
+const FIXED_TS = "2026-01-01T00:00:00.000Z";
+
+describe("compileScore", () => {
+  test("compiles investigate (no required context)", () => {
+    const score = compileScore(investigatePattern, {
+      problem: "investigate logging duplication",
+      generatedAt: FIXED_TS,
+    });
+    expect(score.schemaVersion).toBe(1);
+    expect(score.pattern).toBe("investigate");
+    expect(score.beats.length).toBe(investigatePattern.score.beats.length);
+    expect(score.generatedAt).toBe(FIXED_TS);
+    expect(score.id).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  test("copies static directives verbatim", () => {
+    const score = compileScore(investigatePattern, { problem: "x", generatedAt: FIXED_TS });
+    score.beats.forEach((beat, i) => {
+      const pb = investigatePattern.score.beats[i];
+      expect(beat.directive).toBe(pb.directive);
+      expect(beat.level).toBe(pb.level);
+      expect(beat.voices).toEqual([{ instrument: pb.instrument }]);
+    });
+  });
+
+  test("derives frequencyMap from beat histogram with all 8 levels present", () => {
+    const score = compileScore(investigatePattern, { problem: "x", generatedAt: FIXED_TS });
+    const total = score.beats.length;
+    const counts = score.beats.reduce<Record<number, number>>((acc, b) => {
+      acc[b.level] = (acc[b.level] ?? 0) + 1;
+      return acc;
+    }, {});
+    for (let lvl = 1; lvl <= 8; lvl++) {
+      const expected = total === 0 ? 0 : (counts[lvl] ?? 0) / total;
+      expect(score.frequencyMap.levels[lvl as 1]).toBeCloseTo(expected);
+    }
+    for (const lvl of score.frequencyMap.dominantLevels) {
+      expect(score.frequencyMap.levels[lvl]).toBeGreaterThanOrEqual(DOMINANCE_THRESHOLD);
+    }
+  });
+
+  test("compiles refactor with both required keys", () => {
+    const score = compileScore(refactorPattern, {
+      problem: "rename Score → ExecutableScore",
+      context: { target: "Score interface", invariant: "all imports still type-check" },
+      generatedAt: FIXED_TS,
+    });
+    expect(score.pattern).toBe("refactor");
+    expect(score.context).toEqual({
+      target: "Score interface",
+      invariant: "all imports still type-check",
+    });
+  });
+
+  test("rejects refactor with missing target", () => {
+    expect(() =>
+      compileScore(refactorPattern, {
+        problem: "x",
+        context: { invariant: "i" },
+        generatedAt: FIXED_TS,
+      }),
+    ).toThrow(/requires context\.target/);
+  });
+
+  test("rejects refactor with empty invariant string", () => {
+    expect(() =>
+      compileScore(refactorPattern, {
+        problem: "x",
+        context: { target: "t", invariant: "   " },
+        generatedAt: FIXED_TS,
+      }),
+    ).toThrow(/requires context\.invariant/);
+  });
+
+  test("rejects feature with no context at all", () => {
+    expect(() =>
+      compileScore(featurePattern, { problem: "x", generatedAt: FIXED_TS }),
+    ).toThrow(/requires context\.scope/);
+  });
+
+  test("id is deterministic across calls (excluding generatedAt)", () => {
+    const a = compileScore(refactorPattern, {
+      problem: "p",
+      context: { target: "t", invariant: "i" },
+      generatedAt: FIXED_TS,
+    });
+    const b = compileScore(refactorPattern, {
+      problem: "p",
+      context: { target: "t", invariant: "i" },
+      generatedAt: "2099-12-31T00:00:00.000Z",
+    });
+    expect(a.id).toBe(b.id);
+  });
+
+  test("id changes when context changes", () => {
+    const a = compileScore(refactorPattern, {
+      problem: "p",
+      context: { target: "t1", invariant: "i" },
+      generatedAt: FIXED_TS,
+    });
+    const b = compileScore(refactorPattern, {
+      problem: "p",
+      context: { target: "t2", invariant: "i" },
+      generatedAt: FIXED_TS,
+    });
+    expect(a.id).not.toBe(b.id);
+  });
+
+  test("id changes when problem changes (different fingerprint)", () => {
+    const a = compileScore(refactorPattern, {
+      problem: "p1",
+      context: { target: "t", invariant: "i" },
+      generatedAt: FIXED_TS,
+    });
+    const b = compileScore(refactorPattern, {
+      problem: "p2",
+      context: { target: "t", invariant: "i" },
+      generatedAt: FIXED_TS,
+    });
+    expect(a.id).not.toBe(b.id);
+    expect(a.generatedFrom.canonicalHash).not.toBe(b.generatedFrom.canonicalHash);
+  });
+});
+
+describe("parseAlgorithm", () => {
+  const minimal: AlgorithmInput = {
+    problem: "p",
+    domain: "test",
+    steps: [
+      { verb: "scope", directive: "Scope it." },
+      { verb: "do", directive: "Do it." },
+    ],
+    annotations: [
+      { verb: "scope", level: 3, instrument: "percussion" },
+      { verb: "do", level: 4, instrument: "brass" },
+    ],
+  };
+
+  test("emits a Score with no pattern field", () => {
+    const score = parseAlgorithm({ ...minimal, generatedAt: FIXED_TS });
+    expect(score.pattern).toBeUndefined();
+    expect(score.context).toBeUndefined();
+    expect(score.beats.length).toBe(2);
+  });
+
+  test("rejects empty steps", () => {
+    expect(() => parseAlgorithm({ ...minimal, steps: [] })).toThrow(/empty/);
+  });
+
+  test("rejects step with no matching annotation", () => {
+    expect(() =>
+      parseAlgorithm({
+        ...minimal,
+        steps: [...minimal.steps, { verb: "missing", directive: "x" }],
+      }),
+    ).toThrow(/no matching annotation/);
+  });
+
+  test("rejects orphan annotation with no matching step", () => {
+    expect(() =>
+      parseAlgorithm({
+        ...minimal,
+        annotations: [
+          ...minimal.annotations,
+          { verb: "ghost", level: 1, instrument: "strings" },
+        ],
+      }),
+    ).toThrow(/no matching step/);
+  });
+
+  test("rejects duplicate annotation verbs", () => {
+    expect(() =>
+      parseAlgorithm({
+        ...minimal,
+        annotations: [
+          ...minimal.annotations,
+          { verb: "scope", level: 5, instrument: "piano" },
+        ],
+      }),
+    ).toThrow(/duplicate annotation/);
+  });
+});

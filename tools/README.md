@@ -38,8 +38,8 @@ npx tsx tools/symphony/cli.ts pattern view --pattern refactor --out /tmp/refacto
 The `.ts` module is the source of truth; `pattern view` regenerates a human-readable Markdown view on demand. There is no `.md → .ts` parser — round-trip is one-way.
 
 A pattern lives or dies on three things:
-- **Beats** — step + level + instrument + directive, 5–10 of them. Authored once, reused forever.
-- **`verbTriggers`** — phrases the maestro Setup phase scans for at routing time.
+- **Beats** — step + level + instrument + directive, 5–10 of them. Authored once, reused forever. Live on `PatternScore`.
+- **`verbTriggers`** — phrases the maestro Setup phase scans for at routing time. Owned by the `Pattern` (peer to `requiredContext`), not nested in `score` — routing metadata is not part of the algorithm's shape.
 - **`requiredContext`** — typed list of repo-specific keys the compiler refuses to compile without.
 
 New patterns are authored by maestro on demand following the `draft-pattern` debate path; see `.github/agents/maestro.agent.md` step 1.2.

@@ -52,6 +52,7 @@ interface CliArgs {
   readonly input?: string;
   readonly out?: string;
   readonly pattern?: string;
+  readonly json?: boolean;
 }
 
 function parseArgs(argv: readonly string[]): CliArgs {
@@ -64,6 +65,7 @@ function parseArgs(argv: readonly string[]): CliArgs {
     nextIdx = 2;
   }
   const out: Record<string, string> = {};
+  const flags = new Set<string>();
   for (let i = nextIdx; i < args.length; i++) {
     const arg = args[i];
     if (!arg.startsWith("--")) continue;
@@ -72,6 +74,8 @@ function parseArgs(argv: readonly string[]): CliArgs {
       out[arg.substring(2, eq)] = arg.substring(eq + 1);
     } else if (i + 1 < args.length && !args[i + 1].startsWith("--")) {
       out[arg.substring(2)] = args[++i];
+    } else {
+      flags.add(arg.substring(2));
     }
   }
   return {
@@ -84,6 +88,7 @@ function parseArgs(argv: readonly string[]): CliArgs {
     input: out["input"],
     out: out["out"],
     pattern: out["pattern"],
+    json: flags.has("json"),
   };
 }
 
@@ -91,7 +96,7 @@ function usage(): never {
   process.stderr.write(
     [
       "Usage:",
-      "  symphony list-patterns",
+      "  symphony list-patterns        [--json]",
       "  symphony pattern view         --pattern <name> [--out <file.md>]",
       "  symphony from-pattern         --pattern <name> --input <input.json> --out <score.json>",
       "                                input.json: { problem: string, context?: object }",
@@ -311,14 +316,30 @@ function runLibraryIndex(): number {
   return 0;
 }
 
-function runListPatterns(): number {
+function runListPatterns(args: CliArgs): number {
   const patterns = listPatterns();
+  if (args.json) {
+    const out = patterns.map((p) => ({
+      pattern: p.score.pattern,
+      domain: p.score.domain,
+      defaultComplexity: p.score.defaultComplexity,
+      defaultShape: p.score.defaultShape,
+      verbTriggers: p.verbTriggers,
+      requiredContext: p.requiredContext,
+      beats: p.score.beats.length,
+    }));
+    process.stdout.write(JSON.stringify(out, null, 2) + "\n");
+    return 0;
+  }
   process.stdout.write(`Available patterns (${patterns.length}):\n`);
   for (const p of patterns) {
     const reqd =
-      p.requiredContext.length > 0 ? p.requiredContext.join(",") : "—";
+      p.requiredContext.length > 0 ? p.requiredContext.join(",") : "\u2014";
     process.stdout.write(
       `  ${p.score.pattern.padEnd(14)} domain=${p.score.domain.padEnd(16)} complexity=${p.score.defaultComplexity}  shape=${p.score.defaultShape.padEnd(14)} requiredContext=${reqd}\n`,
+    );
+    process.stdout.write(
+      `    verbs: ${p.verbTriggers.map((v) => (v.includes(" ") ? `"${v}"` : v)).join(", ")}\n`,
     );
   }
   return 0;
@@ -349,7 +370,7 @@ function main(): void {
   const args = parseArgs(process.argv);
   switch (args.command) {
     case "list-patterns":
-      process.exit(runListPatterns());
+      process.exit(runListPatterns(args));
     // eslint-disable-next-line no-fallthrough
     case "pattern":
       process.exit(runPatternView(args));
