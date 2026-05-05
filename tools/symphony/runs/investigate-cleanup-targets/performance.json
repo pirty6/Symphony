@@ -1,0 +1,161 @@
+{
+  "scoreId": "36b7cb0ab1fd4bd11206011d6dfab5bd9717d61d49b27bc65badfa36e50a3b87",
+  "beats": [
+    {
+      "beatIndex": 0,
+      "voices": [
+        {
+          "instrument": "piano",
+          "output": "Decomposed into Q1-Q5: parallel-systems-overlap, concept-tier, layout-vs-conceptual, code-walls, rename/merge/delete-vs-redesign.",
+          "confidence": 0.95
+        }
+      ],
+      "verdict": {
+        "outcome": "applied",
+        "confidence": 0.95,
+        "shouldTerminate": false,
+        "reason": "5 sub-questions enumerated"
+      },
+      "stateHash": "5fd1622b9f1430832136270a10a4d6321299b2e9d90c494558178ffea02aefc1"
+    },
+    {
+      "beatIndex": 1,
+      "voices": [
+        {
+          "instrument": "percussion",
+          "output": "Scope locked: tools/symphony, tools/meta-score, .github/agents/maestro*, READMEs. Plugins out. Audit shape: terminology+structure+layering, NOT runtime behavior.",
+          "confidence": 0.97
+        }
+      ],
+      "verdict": {
+        "outcome": "applied",
+        "confidence": 0.97,
+        "shouldTerminate": false,
+        "reason": "Scope established"
+      },
+      "stateHash": "5fd1622b9f1430832136270a10a4d6321299b2e9d90c494558178ffea02aefc1"
+    },
+    {
+      "beatIndex": 2,
+      "voices": [
+        {
+          "instrument": "strings",
+          "output": "MAJOR DISCOVERY at locate stage: there are FOUR systems, not three. tools/symphony-core/ exists (Framework class, MoveVerdict, TemplateNode={phase|gate|loop_start|loop_end|dispatch}, validator registry, eval toolchain — see symphony-core/types.ts:80,124,158, framework.ts:44, errors.ts:20-73). tools/refactoring/ exists (15 Fowler smells catalog — refactoring/catalog.ts:18,49). symphony-core was not visible in the prior conversation summary. Repo memory references it indirectly but doesn't name the directory.",
+          "confidence": 0.99
+        }
+      ],
+      "verdict": {
+        "outcome": "applied",
+        "confidence": 0.99,
+        "shouldTerminate": false,
+        "reason": "Surprise: 4 systems coexist, not 3"
+      },
+      "stateHash": "5fd1622b9f1430832136270a10a4d6321299b2e9d90c494558178ffea02aefc1"
+    },
+    {
+      "beatIndex": 3,
+      "voices": [
+        {
+          "instrument": "strings",
+          "output": "Newcomer-hostile sites: (a) tools/symphony/types.ts:112 has MoveVerdict with comment 'mirrors symphony-core MoveVerdict at the boundary' — same name, parallel definition, no shared import. Suggests: same type. Does: two distinct types in two systems. Gap: HIGH. (b) Both symphony and symphony-core have a 'verdict' concept; symphony also has Score/Beat while symphony-core has CatalogEntry/CatalogMove. Two parallel vocabularies for similar runtime concepts. (c) tools/refactoring/ uses symphony-core, NOT symphony. Symphony's Score artifact and symphony-core's CatalogEntry are structurally similar but never bridged. (d) tools/symphony/heuristic.ts is for FrequencyMap baseline; FrequencyMap is now mechanically derived in parse.ts — heuristic is dead-code-candidate.",
+          "confidence": 0.96
+        }
+      ],
+      "verdict": {
+        "outcome": "applied",
+        "confidence": 0.96,
+        "shouldTerminate": false,
+        "reason": "Two parallel vocabularies confirmed; MoveVerdict literal duplicate"
+      },
+      "stateHash": "5fd1622b9f1430832136270a10a4d6321299b2e9d90c494558178ffea02aefc1"
+    },
+    {
+      "beatIndex": 4,
+      "voices": [
+        {
+          "instrument": "strings",
+          "output": "Concept tier × system map. LOAD-BEARING: Score (symphony, parser+executor consume), Beat (symphony, executor consumes), Voice (symphony, executor consumes), Performance (symphony, persistence consumes), Level (symphony+agents, annotation tables consume), Instrument (symphony+agents, same), Framework (symphony-core, refactoring imports), TemplateNode (symphony-core, refactoring imports), CatalogEntry (symphony-core+refactoring, RefactoringShape extends), MoveVerdict (BOTH symphony AND symphony-core — DUPLICATE). DERIVED: FrequencyMap (mechanically derived from beats by parse.ts; heuristic.ts is alternate baseline now superseded), Tempo (parser-defaulted; no consumer reads conservatism), Shape (string field on FrequencyMap; one consumer in parser). ACCIDENTAL: Conservatism (TempoConfig field, no consumer reads its value), beatsPerMeasure (set in parser default, no consumer), DOMINANCE_THRESHOLD (one read site, derived computation), heuristic.ts entire module (FrequencyMap baseline obsoleted by parser). System overlap: symphony-only={Score,Beat,Voice,Performance,FrequencyMap,Tempo,heuristic}, symphony-core-only={Framework,TemplateNode,GateNode,DispatchNode,LoopStartNode,LoopEndNode,ValidatorRegistry,EvalRequirement,LifecycleError,DispatchError,SchemaError,ProgressStallError,VerdictValidationError}, refactoring-only={RefactoringShape,refactoringCatalog,refactoringDomain}, meta-score-only={MetaScorePhase,PhaseHandler,ScoreResult,JudgmentOutput} — note ScoreResult in meta-score is DIFFERENT from Score in symphony, naming collision. SHARED-BUT-DUPLICATED={MoveVerdict}.",
+          "confidence": 0.94
+        }
+      ],
+      "verdict": {
+        "outcome": "applied",
+        "confidence": 0.94,
+        "shouldTerminate": false,
+        "reason": "Major findings: MoveVerdict duplicate, ScoreResult/Score collision, symphony-core invisible"
+      },
+      "stateHash": "5fd1622b9f1430832136270a10a4d6321299b2e9d90c494558178ffea02aefc1"
+    },
+    {
+      "beatIndex": 5,
+      "voices": [
+        {
+          "instrument": "woodwinds",
+          "output": "H-a (parallel systems dominant): SUPPORTED with >=2 cites. tools/symphony-core/ exists as a parallel framework to tools/symphony/ doing similar work (Framework vs. parseAlgorithm+performScore, CatalogEntry vs. Score/Beat, validator registry vs. legality.ts beatLegality). Cites: symphony-core/framework.ts:44 (Framework class), symphony/parse.ts (parseAlgorithm), symphony-core/types.ts:80 (MoveVerdict), symphony/types.ts:112 (MoveVerdict). NEITHER imports the other. Counter-evidence: tools/refactoring/ uses symphony-core but not symphony, suggesting they were intended for different domains (refactoring vs. agent debate) — but the underlying primitives overlap heavily. Verdict: parallel-systems is THE dominant axis. H-b (vocabulary load): SECONDARY. 30+ exported types across 4 systems is real, but several are derived/accidental (Conservatism unused, heuristic dead). Not the dominant pain. H-c (layout): MINOR. tools/{meta-score, symphony, symphony-core, refactoring} naming is fine; the issue is what's INSIDE, not the directory layout.",
+          "confidence": 0.92
+        }
+      ],
+      "verdict": {
+        "outcome": "applied",
+        "confidence": 0.92,
+        "shouldTerminate": false,
+        "reason": "Parallel systems = dominant axis; vocabulary secondary; layout minor"
+      },
+      "stateHash": "5fd1622b9f1430832136270a10a4d6321299b2e9d90c494558178ffea02aefc1"
+    },
+    {
+      "beatIndex": 6,
+      "voices": [
+        {
+          "instrument": "brass",
+          "output": "Per-concept verdicts. KEEP-AS-IS: Score, Beat, Voice, Performance (load-bearing in symphony's parse+perform pipeline; user-validated this turn). RENAME: meta-score's ScoreResult collides with symphony's Score — rename to MetaScoreResult. MERGE: MoveVerdict (symphony copy is a duplicate; merge by importing from symphony-core OR moving the canonical to symphony and deleting symphony-core's copy — direction is a decide). MERGE: symphony + symphony-core have parallel concepts (Beat≈CatalogMove, Voice≈Phase, FrequencyMap≈catalog-shape) — this is decide-territory: collapse one into the other or keep deliberately separate. DELETE: heuristic.ts (FrequencyMap baseline, obsoleted by parse.ts derivation). DELETE: Conservatism string field (no consumer reads value). DELETE: beatsPerMeasure default (no consumer). UNRESOLVED: Tempo as a whole (Conservatism+beatsPerMeasure both unused; is Tempo itself dead, or reserved for a future executor that will use it?). UNRESOLVED: Shape field on FrequencyMap (one consumer, parser; could be inlined). UNRESOLVED: provenance cluster (computeScoreId+schemaVersion+fingerprintProblem+generatedFrom) — already gated on Q0 from prior investigation, still gated.",
+          "confidence": 0.91
+        }
+      ],
+      "verdict": {
+        "outcome": "applied",
+        "confidence": 0.91,
+        "shouldTerminate": false,
+        "reason": "4 keep, 1 rename, 2 merge, 3 delete, 3 unresolved"
+      },
+      "stateHash": "5fd1622b9f1430832136270a10a4d6321299b2e9d90c494558178ffea02aefc1"
+    },
+    {
+      "beatIndex": 7,
+      "voices": [
+        {
+          "instrument": "piano",
+          "output": "Confusion model. DOMINANT AXIS: control-flow / layering — specifically: TWO PARALLEL FRAMEWORKS (symphony, symphony-core) with overlapping vocabulary and zero cross-imports. SECONDARY: terminology — MoveVerdict literal duplicate, ScoreResult/Score name collision, several accidental/dead concepts (heuristic.ts, Conservatism, beatsPerMeasure). TERTIARY: layout is fine. Q1: parallel systems overlap is REAL and is the load-bearing pain — but note: symphony-core is genuinely used by tools/refactoring/, so it's not vestigial; the pain is that NO ONE TOLD A NEWCOMER that the two systems exist and serve different domains. Q2: 11+ concepts is misleading — 4 are load-bearing (Score/Beat/Voice/Performance), several are derived (FrequencyMap, Tempo), several are accidental (Conservatism, heuristic, parts of legality). Q3: layout is fine; the conceptual layout exposes 2 parallel frameworks as if they were one codebase. Q4: code wall #1 = symphony/types.ts:112 'mirrors symphony-core' comment without explanation; code wall #2 = the ABSENCE of any README explaining 4 systems. Q5: most confusion is rename/merge/delete — but the symphony-vs-symphony-core split needs a DECIDE step before any merge. WRONG-TEMPLATE CHECK: dominant axis is control-flow/layering, NOT terminology/layout. Per the algorithm step 8 rule, this means a pure refactor target list is the wrong-shape deliverable for the BIGGEST pain. The smaller pains (rename, delete) are still refactor-shaped. NOT halting fully — flagging the wrong-template signal in step 9 by routing the top concern to decide.",
+          "confidence": 0.93
+        }
+      ],
+      "verdict": {
+        "outcome": "applied",
+        "confidence": 0.93,
+        "shouldTerminate": false,
+        "reason": "Dominant axis is layering — 2 parallel frameworks; routing top item to decide not refactor"
+      },
+      "stateHash": "5fd1622b9f1430832136270a10a4d6321299b2e9d90c494558178ffea02aefc1"
+    },
+    {
+      "beatIndex": 8,
+      "voices": [
+        {
+          "instrument": "percussion",
+          "output": "Refactor target list, capped at 12, ranked by (severity x cite-count). #1 [decide] DECIDE: collapse symphony-core into symphony, OR keep them deliberately separate with a documented seam. Cites: symphony-core/{framework.ts:44,types.ts:80}, symphony/{parse.ts,perform.ts,types.ts:112}. Largest single source of confusion. Tag: decide template (forward ref). Prereq: none. #2 [refactor:rename] Rename meta-score's ScoreResult to MetaScoreResult to avoid collision with symphony's Score. Cite: meta-score/meta-score.ts:45. Tag: refactor. Prereq: none. #3 [refactor:merge] Resolve MoveVerdict duplication — make tools/symphony/types.ts import MoveVerdict from symphony-core, delete the duplicate. Cite: symphony/types.ts:112, symphony-core/types.ts:80. Tag: refactor. Prereq: #1 must decide if symphony-core stays. #4 [refactor:delete] Delete tools/symphony/heuristic.ts. Obsoleted by parse.ts deriving FrequencyMap from beats. Cite: symphony/heuristic.ts (entire file), symphony/parse.ts:67-89. Tag: refactor. Prereq: none. #5 [refactor:delete] Delete Conservatism field from TempoConfig (no consumer reads value). Cite: symphony/types.ts:66, symphony/parse.ts:142. Tag: refactor. Prereq: none. #6 [refactor:delete] Delete beatsPerMeasure default value (no consumer reads). Cite: symphony/types.ts:71, symphony/parse.ts:142. Tag: refactor. Prereq: none. #7 [decide] DECIDE: is Tempo as a whole dead, or reserved for future executor? If dead, delete it; if reserved, document the reservation. Cite: symphony/types.ts:64-72. Tag: decide. Prereq: #5,#6 narrow the scope. #8 [refactor:document] Add a top-level README at tools/ that names all 4 systems, what each is for, and what they import from each other. THIS IS THE SINGLE HIGHEST-LEVERAGE NEWCOMER WIN. Cite: absence of any such doc; ls tools/. Tag: refactor (document mode). Prereq: none — can ship before any other target. #9 [refactor:rename] Move 'mirrors symphony-core MoveVerdict at the boundary' comment to a more visible explanation (or delete after #3). Cite: symphony/types.ts:108. Tag: refactor. Prereq: #3. #10 [decide] DECIDE: should tools/refactoring/ use symphony's parseAlgorithm or stay on symphony-core's Framework? Currently they're disconnected. Cite: refactoring/domain.ts:8 (imports symphony-core), no symphony imports. Tag: decide. Prereq: #1.",
+          "confidence": 0.9
+        }
+      ],
+      "verdict": {
+        "outcome": "applied",
+        "confidence": 0.9,
+        "shouldTerminate": false,
+        "reason": "10 targets emitted; #8 (top-level README) is highest-leverage; #1 is largest pain"
+      },
+      "stateHash": "5fd1622b9f1430832136270a10a4d6321299b2e9d90c494558178ffea02aefc1"
+    }
+  ],
+  "startedAt": "2026-05-05T00:00:00.000Z",
+  "completedAt": "2026-05-05T00:00:00.000Z",
+  "outcome": "partial"
+}

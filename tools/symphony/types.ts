@@ -62,14 +62,14 @@ export const INSTRUMENTS: readonly InstrumentType[] = [
 export type DomainKey = string;
 
 // ── Tempo ──────────────────────────────────────────────────────────
+// NOTE: TempoConfig is currently empty. Its previous fields
+// (`conservatism`, `beatsPerMeasure`) were removed because no consumer
+// branched on them. The wrapper is retained pending decision #7 from
+// runs/investigate-cleanup-targets: delete TempoConfig entirely, or
+// repopulate it with fields a real executor will read. Use `{}` at
+// construction sites until that decision is made.
 
-export type Conservatism = "aggressive" | "balanced" | "conservative";
-
-export interface TempoConfig {
-  readonly conservatism: Conservatism;
-  /** Verification cadence: how many beats per gated checkpoint. */
-  readonly beatsPerMeasure: number;
-}
+export type TempoConfig = Record<string, never>;
 
 // ── Problem Fingerprint ────────────────────────────────────────────
 // Two hashes side by side. v1 canonicalizer is identity, so the two
@@ -105,7 +105,7 @@ export interface FrequencyMap {
 /** Default amplitude threshold for `dominantLevels` membership. */
 export const DOMINANCE_THRESHOLD = 0.3;
 
-// ── Verdict (mirrors symphony-core MoveVerdict at the boundary) ────
+// ── Verdict ───────────────────────────────────────────────────────────
 
 export type VerdictOutcome = "applied" | "failed" | "skipped";
 

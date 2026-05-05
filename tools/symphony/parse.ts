@@ -21,7 +21,7 @@ import {
   DOMINANCE_THRESHOLD,
   LEVELS,
   type Beat,
-  type Conservatism,
+
   type DomainKey,
   type FrequencyMap,
   type InstrumentType,
@@ -54,7 +54,7 @@ export interface AlgorithmInput {
   readonly domain: DomainKey;
   readonly steps: readonly AlgorithmStep[];
   readonly annotations: readonly AlgorithmAnnotation[];
-  /** Optional. Defaults to { conservatism: "balanced", beatsPerMeasure: 3 }. */
+  /** Optional. Defaults to `{}` (placeholder pending decision #7). */
   readonly tempo?: TempoConfig;
   /** Optional. Defaults to "layered". */
   readonly shape?: Shape;
@@ -138,8 +138,7 @@ export function parseAlgorithm(input: AlgorithmInput): Score {
     }
   }
 
-  const tempo: TempoConfig =
-    input.tempo ?? { conservatism: "balanced" as Conservatism, beatsPerMeasure: 3 };
+  const tempo: TempoConfig = input.tempo ?? ({} as TempoConfig);
   const shape: Shape = input.shape ?? "layered";
 
   const frequencyMap = buildFrequencyMap(beats, input.domain, shape);

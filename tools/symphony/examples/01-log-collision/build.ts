@@ -49,10 +49,7 @@ const frequencyMap: FrequencyMap = {
   key: "typescript/node-fs",
 };
 
-const tempo: TempoConfig = {
-  conservatism: "conservative",
-  beatsPerMeasure: 4,
-};
+const tempo: TempoConfig = {} as TempoConfig;
 
 const voice = (instrument: Voice["instrument"]): Voice => ({ instrument });
 

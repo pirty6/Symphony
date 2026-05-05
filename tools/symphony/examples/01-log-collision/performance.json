@@ -1,0 +1,93 @@
+{
+  "scoreId": "edb36930633943ada2d24c148627761a345dc9e6b3b6da5e05136682f01a10ab",
+  "beats": [
+    {
+      "beatIndex": 0,
+      "voices": [
+        {
+          "instrument": "strings",
+          "output": "writeFileSync at log.ts:117 is called with utf8 encoding and no flag option. Default flag is 'w' (truncate-and-write).",
+          "confidence": 0.95
+        }
+      ],
+      "verdict": {
+        "outcome": "applied",
+        "confidence": 0.95,
+        "shouldTerminate": false,
+        "reason": "current-state mapped"
+      },
+      "stateHash": "sha256:logts-pre-fix-0000000000000000000000000000000000000000"
+    },
+    {
+      "beatIndex": 1,
+      "voices": [
+        {
+          "instrument": "woodwinds",
+          "output": "Collision needs (a) same ISO ms, (b) same 6-char base36 suffix. Probability ~1/2^31 per-pair, but high under stress (concurrent test fixtures, retry storms).",
+          "confidence": 0.8
+        }
+      ],
+      "verdict": {
+        "outcome": "applied",
+        "confidence": 0.8,
+        "shouldTerminate": false,
+        "reason": "failure mode characterized"
+      },
+      "stateHash": "sha256:logts-pre-fix-0000000000000000000000000000000000000000"
+    },
+    {
+      "beatIndex": 2,
+      "voices": [
+        {
+          "instrument": "brass",
+          "output": "Contract: each invocation must produce a distinct log file. Filesystem-level enforcement is the only race-free option; userspace uniqueness can always lose to a check-then-act window.",
+          "confidence": 0.9
+        }
+      ],
+      "verdict": {
+        "outcome": "applied",
+        "confidence": 0.9,
+        "shouldTerminate": false,
+        "reason": "contract asserted"
+      },
+      "stateHash": "sha256:logts-pre-fix-0000000000000000000000000000000000000000"
+    },
+    {
+      "beatIndex": 3,
+      "voices": [
+        {
+          "instrument": "brass",
+          "output": "Patch: writeFileSync(filePath, body, { encoding: 'utf8', flag: 'wx' }). On EEXIST, regenerate suffix and retry up to N=5.",
+          "confidence": 0.9
+        }
+      ],
+      "verdict": {
+        "outcome": "applied",
+        "confidence": 0.9,
+        "shouldTerminate": false,
+        "reason": "fix applied"
+      },
+      "stateHash": "sha256:logts-post-fix-000000000000000000000000000000000000000"
+    },
+    {
+      "beatIndex": 4,
+      "voices": [
+        {
+          "instrument": "brass",
+          "output": "Test added: two concurrent logFailure calls in same ms with stubbed Math.random produce two distinct files; without wx the test fails, with wx it passes.",
+          "confidence": 0.9
+        }
+      ],
+      "verdict": {
+        "outcome": "applied",
+        "confidence": 0.9,
+        "shouldTerminate": true,
+        "reason": "fix verified"
+      },
+      "stateHash": "sha256:logts-post-fix-000000000000000000000000000000000000000"
+    }
+  ],
+  "startedAt": "2026-04-29T00:00:01.000Z",
+  "completedAt": "2026-04-29T00:00:30.000Z",
+  "outcome": "success"
+}

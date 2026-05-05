@@ -50,10 +50,7 @@ const frequencyMap: FrequencyMap = {
   key: "typescript/internal-api",
 };
 
-const tempo: TempoConfig = {
-  conservatism: "balanced",
-  beatsPerMeasure: 4,
-};
+const tempo: TempoConfig = {} as TempoConfig;
 
 const voice = (instrument: Voice["instrument"]): Voice => ({ instrument });
 
