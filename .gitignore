@@ -1,2 +1,5 @@
 node_modules
 dist
+
+tools/meta-score/logs/
+tools/market-data/iv-history.jsonl

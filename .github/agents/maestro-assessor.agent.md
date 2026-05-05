@@ -1,7 +1,7 @@
 ---
 name: maestro-assessor
 description: "Read-only evidence gatherer for the maestro pipeline. Searches codebase, reads files, analyzes structure. Returns structured findings (CONCRETE, INVARIANTS, STRATEGIES, VERIFY_HOOKS, etc). Never modifies files."
-tools: [read, search]
+tools: [semantic_search, grep_search, file_search, read_file, list_dir]
 agents: []
 user-invocable: false
 ---

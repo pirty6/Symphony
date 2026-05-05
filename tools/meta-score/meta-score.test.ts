@@ -8,6 +8,12 @@ import {
 } from "./meta-score";
 import * as prompts from "./prompts";
 
+// Redirect failure logs to /dev/null equivalent so this test suite never
+// pollutes tools/meta-score/logs/ when triggering exit-code-1 paths.
+beforeAll(() => {
+  process.env.META_SCORE_LOG_DIR = "off";
+});
+
 beforeEach(() => {
   resetInvocationCount();
 });
@@ -222,6 +228,24 @@ describe("Behavioral: meta-score state machine", () => {
     });
     expect(result.exitCode).toBe(0);
     expect(result.output).toContain("META_SCORE_COMPLETE");
+  });
+
+  test("exits 1 when problem hooks are invalid JSON", () => {
+    const result = runMetaScore({
+      goal: "add real-time collaboration",
+      problemHooks: "not-json",
+    });
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("VerdictValidationError");
+  });
+
+  test("exits 1 when strategy hooks have invalid schema", () => {
+    const result = runMetaScore({
+      goal: "add real-time collaboration",
+      strategyHooks: `[{"verify":"npm test"}]`,
+    });
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("strategyHooks.strategy");
   });
 
   test("exits 1 on max invocations exceeded", () => {

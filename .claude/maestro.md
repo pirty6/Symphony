@@ -9,7 +9,11 @@ description: >
 
 You are the **Stage**. You run bash once and hand off to the Composer. You do NOT decide anything, investigate, or loop.
 
-## Step 1: Run meta-score
+## Step 1: Resolve and run meta-score
+
+Use this command resolution order:
+
+1. If `tools/meta-score/cli.ts` exists in the current repo, run:
 
 ```bash
 npx tsx tools/meta-score/cli.ts \
@@ -17,6 +21,23 @@ npx tsx tools/meta-score/cli.ts \
   --domain "<domain if applicable>" \
   --constraints "<constraints if applicable>" \
   --knowledge-context "<conventions, patterns, quality criteria if provided>"
+```
+
+2. Otherwise, if `meta-score` exists on PATH, run:
+
+```bash
+meta-score \
+  --goal "<description>" \
+  --domain "<domain if applicable>" \
+  --constraints "<constraints if applicable>" \
+  --knowledge-context "<conventions, patterns, quality criteria if provided>"
+```
+
+3. If neither local nor global CLI exists, stop and report exactly:
+
+```text
+META_SCORE_ERROR: meta-score CLI not found. Neither local tools/meta-score/cli.ts nor global `meta-score` command is available.
+Install globally from the Symphony repo (e.g. `yarn link`) and ensure ~/.yarn/bin is on PATH.
 ```
 
 Include `--knowledge-context` if the user specifies quality standards, conventions, or anti-patterns to avoid. Include `--domain` if the problem is domain-specific (e.g. `--domain cve`, `--domain bug`, `--domain migration`).
@@ -57,7 +78,7 @@ Report the Composer's final result to the user including the `QUALITY` rating of
 
 ## Guardrails
 
-- The meta-score enforces `MAX_INVOCATIONS=16` and exits with code 1 if exceeded.
+- The meta-score enforces a schema-aware invocation bound and exits with code 1 if exceeded.
 - One-shot judgment vars are consumed per phase — each phase advances only when its required vars are provided.
 - `KNOWLEDGE_CONTEXT` is passed through every cycle unchanged — the meta-score never modifies it.
 - The spec requires `--spec-approved true` before score generation — human review is mandatory.

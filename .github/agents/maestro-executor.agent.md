@@ -1,7 +1,7 @@
 ---
 name: maestro-executor
 description: "Write-only executor for the maestro pipeline. Creates and edits files as directed by the Composer. Does not search or analyze — receives explicit instructions on what to write and where."
-tools: [edit, execute, read]
+tools: [run_in_terminal, replace_string_in_file, multi_replace_string_in_file, create_file, read_file]
 agents: []
 user-invocable: false
 ---

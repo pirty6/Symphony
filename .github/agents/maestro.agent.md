@@ -1,7 +1,7 @@
 ---
 name: maestro
 description: "Resolve any well-defined problem using a pattern-aware escalation ladder. Triggers on: fix this, resolve, debug, find a clean solution, there's a bug, something is broken, how do I fix, find the right pattern for. DOES NOT APPLY TO: exploratory research, architecture decisions without a concrete problem to solve, or tasks with no verifiable success condition."
-tools: [execute, read, agent, todo]
+tools: [runSubagent, run_in_terminal, manage_todo_list, read_file]
 agents: [maestro-composer]
 ---
 
@@ -64,3 +64,12 @@ Report the Composer's final result to the user including the `QUALITY` rating of
 
 **On any `*_WARNING` or `*_ERROR` line in output:**
 Stop immediately. Show the user the exact line. Ask: *"The meta-score reported a failure — do you want to continue?"* Do not proceed until they confirm.
+
+## False-handoff prevention
+
+- NEVER fabricate or summarize a Composer handoff. The handoff is real **only** if `runSubagent` was invoked and returned a result.
+- If `runSubagent` is unavailable in the current session, do NOT claim "blocked by protocol tooling mismatch" or paraphrase CLI output as a final answer. Instead:
+  1. Print the raw CLI output verbatim between `META_SCORE_OUTPUT_BEGIN` / `META_SCORE_OUTPUT_END` markers.
+  2. Tell the user: *"`runSubagent` is unavailable; cannot complete the Composer handoff. Re-run me in a session where the agent runtime is enabled, or run the Composer manually."*
+  3. Stop. Do not implement, edit, or take any other action.
+- The Stage has exactly two valid terminal states: (a) exit 0/1 reported verbatim, or (b) `runSubagent` invoked successfully and the Composer's final result reported verbatim. Anything else is a protocol violation.

@@ -1,0 +1,78 @@
+[
+  {
+    "ticker": "AAPL",
+    "sector": "tech-megacap",
+    "spot": 270.94,
+    "ivRank": 62,
+    "ivPre": 0.38,
+    "openInterest": 25000,
+    "catalyst": { "kind": "EARNINGS", "description": "Q2 earnings + CEO transition", "date": "2026-04-30" },
+    "historicalMoves": [4.5, -2.1, 6.8, -7.3, 1.2, 3.4, -1.5, 5.0],
+    "dailyReturns30d": [0.010, -0.020, 0.015, 0.005, -0.010, 0.020, -0.005, 0.012, -0.018, 0.008, 0.003, -0.012, 0.022, 0.007, -0.009, 0.014, -0.011, 0.018, 0.001, -0.006, 0.011, -0.004]
+  },
+  {
+    "ticker": "MSFT",
+    "sector": "tech-megacap",
+    "spot": 412.50,
+    "ivRank": 55,
+    "ivPre": 0.32,
+    "openInterest": 18000,
+    "catalyst": { "kind": "EARNINGS", "description": "Q3 earnings", "date": "2026-04-29" },
+    "historicalMoves": [2.8, 1.5, -0.4, 4.2, 3.1, -2.9, 1.0, 2.3],
+    "dailyReturns30d": [0.011, -0.018, 0.013, 0.006, -0.012, 0.019, -0.004, 0.010, -0.016, 0.007, 0.005, -0.011, 0.021, 0.008, -0.007, 0.013, -0.010, 0.017, 0.002, -0.005, 0.010, -0.003]
+  },
+  {
+    "ticker": "META",
+    "sector": "tech-megacap",
+    "spot": 488.10,
+    "ivRank": 70,
+    "openInterest": 14500,
+    "catalyst": { "kind": "EARNINGS", "description": "Q1 earnings", "date": "2026-04-30" },
+    "dailyReturns30d": [0.012, -0.022, 0.018, 0.003, -0.008, 0.023, -0.007, 0.010, -0.020, 0.011, 0.001, -0.014, 0.025, 0.005, -0.011, 0.016, -0.013, 0.020, -0.001, -0.008, 0.013, -0.002]
+  },
+  {
+    "ticker": "XOM",
+    "sector": "energy",
+    "spot": 118.20,
+    "ivRank": 48,
+    "openInterest": 9200,
+    "catalyst": { "kind": "EARNINGS", "description": "Q1 earnings", "date": "2026-05-01" },
+    "dailyReturns30d": [-0.005, 0.012, -0.008, -0.003, 0.018, -0.010, 0.006, -0.015, 0.009, 0.002, -0.012, 0.014, -0.020, -0.001, 0.011, -0.008, 0.013, -0.015, 0.005, 0.009, -0.012, 0.007]
+  },
+  {
+    "ticker": "BIIB",
+    "sector": "biotech",
+    "spot": 215.40,
+    "ivRank": 78,
+    "openInterest": 3200,
+    "catalyst": { "kind": "FDA_BINARY", "description": "PDUFA date for ALZ drug", "date": "2026-04-30" }
+  },
+  {
+    "ticker": "F",
+    "sector": "auto",
+    "spot": 12.85,
+    "ivRank": 65,
+    "openInterest": 4500,
+    "catalyst": { "kind": "EARNINGS", "description": "Q1 earnings", "date": "2026-04-30" }
+  },
+  {
+    "ticker": "GOOGL",
+    "sector": "tech-megacap",
+    "spot": 165.20,
+    "ivRank": 58,
+    "openInterest": 22000,
+    "catalyst": { "kind": "EARNINGS", "description": "Q1 earnings", "date": "2026-04-29" }
+  },
+  {
+    "ticker": "PFE",
+    "sector": "pharma",
+    "spot": 28.45,
+    "ivRank": 52,
+    "openInterest": 7800,
+    "catalyst": { "kind": "EARNINGS", "description": "Q1 earnings", "date": "2026-04-30" },
+    "hedgeTicker": "XLV",
+    "hedgeSpot": 138.20,
+    "hedgeIv": 0.22,
+    "dailyReturns30d": [0.003, -0.005, 0.001, 0.004, 0.002, -0.003, 0.006, -0.002, 0.005, -0.004, 0.008, -0.001, 0.003, -0.005, 0.002, 0.004, -0.003, 0.006, 0.001, -0.002, 0.005, -0.004]
+  }
+]

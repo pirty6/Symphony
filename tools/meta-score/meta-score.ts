@@ -86,6 +86,13 @@ import {
   promptScoreExecutionComposer,
   promptScoreExecutionInstrument,
 } from "./prompts";
+import {
+  FrameworkError,
+  LifecycleError,
+  VerdictValidationError,
+} from "../symphony-core/errors";
+import type { FrameworkState } from "../symphony-core/types";
+import { logFailure } from "./log";
 
 // ── Judgment emitter ───────────────────────────────────────────────
 
@@ -157,6 +164,74 @@ function judgment(
     },
   };
 }
+
+function parseHookArray(raw: string, field: "problemHooks" | "strategyHooks"): unknown[] {
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      throw new VerdictValidationError(field, "JSON array", parsed, "meta-score-input");
+    }
+    return parsed;
+  } catch (error: unknown) {
+    if (error instanceof FrameworkError) {
+      throw error;
+    } else if (error instanceof SyntaxError) {
+      throw new VerdictValidationError(field, "valid JSON", raw, "meta-score-input");
+    } else {
+      throw error;
+    }
+  }
+}
+
+function validateVerdict(input: MetaScoreInput): void {
+  if (input.problemHooks) {
+    const hooks = parseHookArray(input.problemHooks, "problemHooks");
+    for (const hook of hooks) {
+      const candidate = hook as Record<string, unknown>;
+      if (typeof candidate.verify !== "string" || candidate.verify.trim() === "") {
+        throw new VerdictValidationError(
+          "problemHooks.verify",
+          "non-empty string",
+          candidate.verify,
+          "meta-score-input",
+        );
+      }
+    }
+  }
+
+  if (input.strategyHooks) {
+    const hooks = parseHookArray(input.strategyHooks, "strategyHooks");
+    for (const hook of hooks) {
+      const candidate = hook as Record<string, unknown>;
+      if (typeof candidate.strategy !== "string" || candidate.strategy.trim() === "") {
+        throw new VerdictValidationError(
+          "strategyHooks.strategy",
+          "non-empty string",
+          candidate.strategy,
+          "meta-score-input",
+        );
+      }
+      if (typeof candidate.verify !== "string" || candidate.verify.trim() === "") {
+        throw new VerdictValidationError(
+          "strategyHooks.verify",
+          "non-empty string",
+          candidate.verify,
+          "meta-score-input",
+        );
+      }
+    }
+  }
+}
+
+function resolveMaxInvocations(input: MetaScoreInput): number {
+  const baseBound = phaseRegistry.size * 2;
+  const strategyCount = (input.strategiesOrdered ?? input.strategiesRaw ?? "")
+    .split("|")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0).length;
+  return baseBound + strategyCount;
+}
+
 
 // ── Phase logic ────────────────────────────────────────────────────
 
@@ -395,42 +470,75 @@ const phaseRegistry: PhaseRegistry = {
   size: 8,
 };
 
-const MAX_INVOCATIONS = phaseRegistry.size * 2;
 let invocationCount = 0;
+let frameworkState: FrameworkState = "uninitialized";
 
 export function runMetaScore(input: MetaScoreInput): ScoreResult {
-  invocationCount++;
-  if (invocationCount > MAX_INVOCATIONS) {
-    return {
-      exitCode: 1,
-      output: `META_SCORE_ERROR: Max invocations (${MAX_INVOCATIONS}) exceeded. Aborting.`,
-    };
-  }
+  try {
+    if (frameworkState === "executing") {
+      throw new LifecycleError("runMetaScore", "initialized", frameworkState);
+    }
+    if (frameworkState === "uninitialized") {
+      frameworkState = "initialized";
+    }
+    frameworkState = "executing";
 
-  // Validate required input
-  if (!input.goal) {
-    return {
-      exitCode: 1,
-      output: "META_SCORE_ERROR: GOAL is required.",
-    };
-  }
+    invocationCount++;
+    const maxInvocations = resolveMaxInvocations(input);
+    if (invocationCount > maxInvocations) {
+      const result: ScoreResult = {
+        exitCode: 1,
+        output: `META_SCORE_ERROR: Max invocations (${maxInvocations}) exceeded. Aborting.`,
+      };
+      logFailure(input, result);
+      return result;
+    }
 
-  for (const { handler } of phaseRegistry.entries) {
-    const result = handler(input);
-    if (result !== null) {
-      return result; // Phase needs judgment — pause
+    validateVerdict(input);
+
+    // Validate required input
+    if (!input.goal) {
+      const result: ScoreResult = {
+        exitCode: 1,
+        output: "META_SCORE_ERROR: GOAL is required.",
+      };
+      logFailure(input, result);
+      return result;
+    }
+
+    for (const { handler } of phaseRegistry.entries) {
+      const result = handler(input);
+      if (result !== null) {
+        return result; // Phase needs judgment — pause
+      }
+    }
+
+    // All phases complete
+    return {
+      exitCode: 0,
+      output: "META_SCORE_COMPLETE: All phases finished successfully.",
+    };
+  } catch (error: unknown) {
+    if (error instanceof FrameworkError) {
+      const result: ScoreResult = {
+        exitCode: 1,
+        output: `META_SCORE_ERROR: ${error.name}: ${error.message}`,
+      };
+      logFailure(input, result, error);
+      return result;
+    } else {
+      throw error;
+    }
+  } finally {
+    if (frameworkState === "executing") {
+      frameworkState = "initialized";
     }
   }
-
-  // All phases complete
-  return {
-    exitCode: 0,
-    output: "META_SCORE_COMPLETE: All phases finished successfully.",
-  };
 }
 
 // ── Reset (for testing) ────────────────────────────────────────────
 
 export function resetInvocationCount(): void {
   invocationCount = 0;
+  frameworkState = "uninitialized";
 }
