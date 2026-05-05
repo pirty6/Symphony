@@ -67,11 +67,11 @@ export function createEngine(config: EngineConfig): EngineState {
   const internal: InternalState = {
     prompt,
     patterns: config.patterns,
-    active: null,
+    active: undefined,
     context: {},
     draftRound: 0,
     debateComplexityHint: 2,
-    score: null,
+    score: undefined,
     performedBeats: [],
     startedAt: clock(),
   };
@@ -151,7 +151,7 @@ function resolveMatchPattern(
   nid: () => string,
 ): EngineState {
   if (res.chosen === "no-match") {
-    return enterDraftPatternRound(internal, 1, null, nid);
+    return enterDraftPatternRound(internal, 1, undefined, nid);
   }
   const target = findPattern(internal.patterns, res.chosen);
   if (!target) {
@@ -181,7 +181,7 @@ function resolveConfirmFit(
     if (!target) {
       return failed(`confirm-fit: reroute target '${res.reroute}' not registered`);
     }
-    const cleared: InternalState = { ...internal, active: null, context: {} };
+    const cleared: InternalState = { ...internal, active: undefined, context: {} };
     return enterConfirmFit(
       cleared,
       {
@@ -198,7 +198,7 @@ function resolveConfirmFit(
     pattern: p.score.pattern,
     matchedVerb: bestVerbFor(internal.prompt, p) ?? "(any)",
   }));
-  const cleared: InternalState = { ...internal, active: null, context: {} };
+  const cleared: InternalState = { ...internal, active: undefined, context: {} };
   return runningPause(cleared, makeMatchPatternPause(internal.prompt, all, nid));
 }
 
@@ -396,7 +396,7 @@ function enterAfterConfirmFit(internal: InternalState, nid: () => string): Engin
 function enterDraftPatternRound(
   internal: InternalState,
   round: number,
-  priorDraft: Pattern | null,
+  priorDraft: Pattern | undefined,
   nid: () => string,
 ): EngineState {
   const complexity = pickDebateComplexity(round, internal.debateComplexityHint);
@@ -444,7 +444,7 @@ function resolveClassifyComplexity(
   if (candidates.length > 1) {
     return runningPause(next, makeMatchPatternPause(next.prompt, candidates, nid));
   }
-  return enterDraftPatternRound(next, 1, null, nid);
+  return enterDraftPatternRound(next, 1, undefined, nid);
 }
 
 function enterGoGate(internal: InternalState, nid: () => string): EngineState {
@@ -554,7 +554,7 @@ function makeGoGatePause(
 
 // ── Validation ─────────────────────────────────────────────────────
 
-function validateVoiceOutputs(outputs: PerformRes["voiceOutputs"], beat: Beat): string | null {
+function validateVoiceOutputs(outputs: PerformRes["voiceOutputs"], beat: Beat): string | undefined {
   if (!Array.isArray(outputs) || outputs.length === 0) {
     return "voiceOutputs must be a non-empty array";
   }
@@ -587,10 +587,10 @@ function validateVoiceOutputs(outputs: PerformRes["voiceOutputs"], beat: Beat): 
       return `voiceOutputs[${i}].producedBy must be one of: ${VOICE_PRODUCERS.join(", ")}`;
     }
   }
-  return null;
+  return undefined;
 }
 
-function validateVerdict(v: MoveVerdict): string | null {
+function validateVerdict(v: MoveVerdict): string | undefined {
   if (!v) {
     return "verdict required";
   }
@@ -606,7 +606,7 @@ function validateVerdict(v: MoveVerdict): string | null {
   if (typeof v.shouldTerminate !== "boolean") {
     return "verdict.shouldTerminate must be boolean";
   }
-  return null;
+  return undefined;
 }
 
 // ── Derivations ────────────────────────────────────────────────────
@@ -615,9 +615,9 @@ function findPattern(patterns: readonly Pattern[], name: string): Pattern | unde
   return patterns.find((p) => p.score.pattern === name);
 }
 
-function bestVerbFor(prompt: string, pattern: Pattern): string | null {
+function bestVerbFor(prompt: string, pattern: Pattern): string | undefined {
   const lower = prompt.toLowerCase();
-  let best: string | null = null;
+  let best: string | undefined = undefined;
   for (const verb of pattern.verbTriggers) {
     if (lower.includes(verb.toLowerCase())) {
       if (!best || verb.length > best.length) {
@@ -692,7 +692,7 @@ function instrumentForConfirm(_s: PatternSummary): string {
 function composerForDraft(
   round: number,
   complexity: Complexity,
-  priorDraft: Pattern | null,
+  priorDraft: Pattern | undefined,
 ): string {
   return [
     `Draft-pattern round ${round}/${MAESTRO_DRAFT_MAX_ROUNDS} (complexity ${complexity}).`,
@@ -703,7 +703,7 @@ function composerForDraft(
 function instrumentForDraft(
   round: number,
   complexity: Complexity,
-  _priorDraft: Pattern | null,
+  _priorDraft: Pattern | undefined,
 ): string {
   return `Round ${round}; complexity ${complexity}. Spawn proposer${
     complexity >= 2 ? " + skeptic" : ""

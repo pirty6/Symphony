@@ -54,7 +54,7 @@ type DraftPatternRoundPause = BasePause & {
     readonly round: number;
     readonly maxRounds: number;
     readonly complexity: Complexity;
-    readonly priorDraft: Pattern | null;
+    readonly priorDraft: Pattern | undefined;
   };
 };
 

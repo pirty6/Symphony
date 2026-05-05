@@ -114,19 +114,23 @@ function classifyInstrument(): string {
   return "Return one of: 1 (trivial), 2 (standard), 3 (high), 4 (novel).";
 }
 
-function draftComposer(round: number, complexity: Complexity, priorDraft: Pattern | null): string {
+function draftComposer(
+  round: number,
+  complexity: Complexity,
+  priorDraft: Pattern | undefined,
+): string {
   const agents = [
     "proposer",
-    complexity >= 2 ? "skeptic" : null,
-    complexity >= 3 ? "pragmatist" : null,
-    complexity >= 4 ? "template-critic" : null,
+    complexity >= 2 ? "skeptic" : undefined,
+    complexity >= 3 ? "pragmatist" : undefined,
+    complexity >= 4 ? "template-critic" : undefined,
   ].filter(Boolean) as string[];
   return [
     `Draft-pattern round ${round} of ${MAESTRO_DRAFT_MAX_ROUNDS} (complexity ${complexity}).`,
     "",
     `Spawn: ${agents.join(", ")}.`,
     priorDraft
-      ? `Prior draft to iterate on:\n${JSON.stringify(priorDraft, null, 2)}`
+      ? `Prior draft to iterate on:\n${JSON.stringify(priorDraft, undefined, 2)}`
       : "No prior draft; propose from scratch.",
     "",
     "Synthesize a Pattern TS module. Show it to the user in plain prose:",
@@ -153,7 +157,7 @@ function elicitComposer(
     `Pattern '${pattern}' requires context. Some keys are still missing.`,
     "",
     `Missing: [${missing.join(", ")}]`,
-    `Already collected: ${JSON.stringify(collected, null, 2)}`,
+    `Already collected: ${JSON.stringify(collected, undefined, 2)}`,
     "",
     "For each missing key:",
     "  1. Try to extract from the user's original prompt. State the extraction explicitly.",

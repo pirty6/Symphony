@@ -22,11 +22,11 @@ export interface InternalState {
   /** Static + drafted patterns, all carried as data. */
   readonly patterns: readonly Pattern[];
   /** Active pattern is referenced by name; resolve via patterns[]. */
-  readonly active: { readonly patternName: string; readonly matchedVerb: string } | null;
+  readonly active: { readonly patternName: string; readonly matchedVerb: string } | undefined;
   readonly context: Readonly<Record<string, string>>;
   readonly draftRound: number;
   readonly debateComplexityHint: Complexity;
-  readonly score: ExecutableScore | null;
+  readonly score: ExecutableScore | undefined;
   readonly performedBeats: readonly PerformedBeat[];
   readonly startedAt: string;
 }

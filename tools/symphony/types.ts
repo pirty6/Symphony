@@ -160,24 +160,20 @@ export interface PerformedVoice {
 export interface PerformedBeat {
   readonly beatIndex: number;
   readonly voices: readonly PerformedVoice[];
-  /** null if the beat ran but produced no actionable verdict. */
-  readonly verdict: MoveVerdict | null;
+  /** undefined if the beat ran but produced no actionable verdict. */
+  readonly verdict: MoveVerdict | undefined;
   readonly stateHash: string;
 }
 
-export type PerformanceOutcome =
-  | "success"
-  | "partial"
-  | "failed"
-  | "in-progress";
+export type PerformanceOutcome = "success" | "partial" | "failed" | "in-progress";
 
 export interface Performance {
   /** Foreign key into Score.id. */
   readonly scoreId: string;
   readonly beats: readonly PerformedBeat[];
   readonly startedAt: string;
-  /** null while in-progress. */
-  readonly completedAt: string | null;
+  /** undefined while in-progress. */
+  readonly completedAt: string | undefined;
   readonly outcome: PerformanceOutcome;
 }
 
@@ -209,8 +205,8 @@ export interface SavedRun {
 
 export interface VerdictDelta {
   readonly beatIndex: number;
-  readonly saved: MoveVerdict | null;
-  readonly fresh: MoveVerdict | null;
+  readonly saved: MoveVerdict | undefined;
+  readonly fresh: MoveVerdict | undefined;
 }
 
 export interface HashDelta {

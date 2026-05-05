@@ -116,7 +116,7 @@ function readJson<T>(file: string): T {
 
 function writeJson(file: string, value: unknown): void {
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, JSON.stringify(value, null, 2) + "\n", "utf8");
+  fs.writeFileSync(file, JSON.stringify(value, undefined, 2) + "\n", "utf8");
 }
 
 function runFromPattern(args: CliArgs): number {
@@ -342,7 +342,7 @@ function runListPatterns(args: CliArgs): number {
       requiredContext: p.requiredContext,
       beats: p.score.beats.length,
     }));
-    process.stdout.write(JSON.stringify(out, null, 2) + "\n");
+    process.stdout.write(JSON.stringify(out, undefined, 2) + "\n");
     return 0;
   }
   process.stdout.write(`Available patterns (${patterns.length}):\n`);

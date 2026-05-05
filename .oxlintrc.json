@@ -80,7 +80,8 @@
     "import/no-duplicates": "error",
 
     "unicorn/no-instanceof-array": "error",
-    "unicorn/no-invalid-remove-event-listener": "error"
+    "unicorn/no-invalid-remove-event-listener": "error",
+    "unicorn/no-null": "error"
   },
   "ignorePatterns": ["node_modules", "dist"]
 }

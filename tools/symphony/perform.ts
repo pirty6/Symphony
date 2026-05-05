@@ -40,7 +40,7 @@ export interface BeatExecutorContext {
 
 export interface BeatExecutorResult {
   readonly voices: readonly PerformedVoice[];
-  readonly verdict: MoveVerdict | null;
+  readonly verdict: MoveVerdict | undefined;
   /** Optional. If omitted, defaults to a hash of (scoreId + beatIndex). */
   readonly stateHash?: string;
 }
@@ -78,8 +78,7 @@ export async function performScore(
       score,
       previous: performed,
     });
-    const stateHash =
-      result.stateHash ?? defaultStateHash(score.id, i);
+    const stateHash = result.stateHash ?? defaultStateHash(score.id, i);
     performed.push({
       beatIndex: i,
       voices: result.voices,
@@ -119,14 +118,14 @@ export function scaffoldPerformance(
       output: "",
       confidence: 0,
     })),
-    verdict: null,
+    verdict: undefined,
     stateHash: defaultStateHash(score.id, i),
   }));
   return {
     scoreId: score.id,
     beats,
     startedAt: clock(),
-    completedAt: null,
+    completedAt: undefined,
     outcome: "in-progress",
   };
 }
@@ -134,24 +133,31 @@ export function scaffoldPerformance(
 // ── Internals ──────────────────────────────────────────────────────
 
 function defaultStateHash(scoreId: string, beatIndex: number): string {
-  return crypto
-    .createHash("sha256")
-    .update(`scaffold:${scoreId}:${beatIndex}`)
-    .digest("hex");
+  return crypto.createHash("sha256").update(`scaffold:${scoreId}:${beatIndex}`).digest("hex");
 }
 
 function deriveOutcome(
   beats: readonly PerformedBeat[],
   terminatedEarly: boolean,
 ): PerformanceOutcome {
-  if (beats.length === 0) {return "in-progress";}
+  if (beats.length === 0) {
+    return "in-progress";
+  }
   const verdicts = beats.map((b) => b.verdict);
-  if (verdicts.every((v) => v === null)) {return "partial";}
-  if (verdicts.some((v) => v?.outcome === "failed")) {return "failed";}
+  if (verdicts.every((v) => v === null)) {
+    return "partial";
+  }
+  if (verdicts.some((v) => v?.outcome === "failed")) {
+    return "failed";
+  }
   if (terminatedEarly) {
     const last = verdicts[verdicts.length - 1];
-    if (last?.outcome === "applied") {return "success";}
-    if (last?.outcome === "failed") {return "failed";}
+    if (last?.outcome === "applied") {
+      return "success";
+    }
+    if (last?.outcome === "failed") {
+      return "failed";
+    }
     return "partial";
   }
   return "success";

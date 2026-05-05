@@ -53,7 +53,7 @@ function emitPauseAndExit(state: EngineState): void {
         composerPrompt: composerPromptFor(pause),
         instrumentPrompt: instrumentPromptFor(pause),
       },
-      null,
+      undefined,
       2,
     ) + "\n",
   );
@@ -72,7 +72,7 @@ function emitDoneAndExit(state: EngineState): void {
         executableScore: state.result.executableScore,
         performance: state.result.performance,
       },
-      null,
+      undefined,
       2,
     ) + "\n",
   );
@@ -81,7 +81,7 @@ function emitDoneAndExit(state: EngineState): void {
 
 function writeState(file: string, state: EngineState): void {
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, JSON.stringify(state, null, 2) + "\n", "utf8");
+  fs.writeFileSync(file, JSON.stringify(state, undefined, 2) + "\n", "utf8");
 }
 
 function readState(file: string): EngineState {

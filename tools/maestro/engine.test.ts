@@ -103,7 +103,7 @@ describe("match-pattern routing", () => {
     const s1 = classifyAt(s0, 2);
     const pause = expectPause(s1, "draft-pattern-round");
     expect(pause.payload.round).toBe(1);
-    expect(pause.payload.priorDraft).toBeNull();
+    expect(pause.payload.priorDraft).toBeUndefined();
   });
 });
 

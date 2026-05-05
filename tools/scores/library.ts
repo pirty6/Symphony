@@ -40,11 +40,15 @@ export interface ScoreLibraryIndex {
 }
 
 function listSavedRunFiles(storeDir: string): readonly string[] {
-  if (!fs.existsSync(storeDir)) {return [];}
+  if (!fs.existsSync(storeDir)) {
+    return [];
+  }
   const out: string[] = [];
   const patternDirs = fs.readdirSync(storeDir, { withFileTypes: true });
   for (const dir of patternDirs) {
-    if (!dir.isDirectory()) {continue;}
+    if (!dir.isDirectory()) {
+      continue;
+    }
     const sub = path.join(storeDir, dir.name);
     const files = fs.readdirSync(sub, { withFileTypes: true });
     for (const f of files) {
@@ -61,9 +65,7 @@ function listSavedRunFiles(storeDir: string): readonly string[] {
  * are skipped silently (likely in-progress writes); the verify CLI
  * is the place to surface those.
  */
-export function buildLibraryIndex(
-  storeDir: string = STORE_DIR,
-): ScoreLibraryIndex {
+export function buildLibraryIndex(storeDir: string = STORE_DIR): ScoreLibraryIndex {
   const files = listSavedRunFiles(storeDir);
   const entries: SavedRunIndexEntry[] = [];
   for (const file of files) {
@@ -98,15 +100,15 @@ export function writeLibraryIndex(
 ): ScoreLibraryIndex {
   const index = buildLibraryIndex(storeDir);
   fs.mkdirSync(path.dirname(indexFile), { recursive: true });
-  fs.writeFileSync(indexFile, JSON.stringify(index, null, 2) + "\n", "utf8");
+  fs.writeFileSync(indexFile, JSON.stringify(index, undefined, 2) + "\n", "utf8");
   return index;
 }
 
 /** Load the persisted index from disk, or build it on the fly. */
-export function loadLibraryIndex(
-  indexFile: string = INDEX_FILE,
-): ScoreLibraryIndex {
-  if (!fs.existsSync(indexFile)) {return buildLibraryIndex();}
+export function loadLibraryIndex(indexFile: string = INDEX_FILE): ScoreLibraryIndex {
+  if (!fs.existsSync(indexFile)) {
+    return buildLibraryIndex();
+  }
   const raw = fs.readFileSync(indexFile, "utf8");
   return JSON.parse(raw) as ScoreLibraryIndex;
 }

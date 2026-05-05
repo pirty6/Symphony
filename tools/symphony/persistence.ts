@@ -65,8 +65,12 @@ export function computeExecutableScoreId(
     beats: score.beats,
     generatedFrom: score.generatedFrom,
   };
-  if (score.pattern !== undefined) {base["pattern"] = score.pattern;}
-  if (score.context !== undefined) {base["context"] = score.context;}
+  if (score.pattern !== undefined) {
+    base["pattern"] = score.pattern;
+  }
+  if (score.context !== undefined) {
+    base["context"] = score.context;
+  }
   return sha256(JSON.stringify(base));
 }
 
@@ -114,7 +118,7 @@ export function savedRunPath(run: SavedRun, root: string = STORE_DIR): string {
 export function saveRun(run: SavedRun, root: string = STORE_DIR): string {
   const file = savedRunPath(run, root);
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, JSON.stringify(run, null, 2) + "\n", "utf8");
+  fs.writeFileSync(file, JSON.stringify(run, undefined, 2) + "\n", "utf8");
   return file;
 }
 
@@ -159,9 +163,7 @@ export function loadRun(filePath: string): SavedRun {
   }
   run.performance.beats.forEach((b, i) => {
     if (b.beatIndex !== i) {
-      throw new Error(
-        `Performance.beats[${i}].beatIndex=${b.beatIndex} (expected ${i})`,
-      );
+      throw new Error(`Performance.beats[${i}].beatIndex=${b.beatIndex} (expected ${i})`);
     }
   });
   return run;
@@ -169,12 +171,13 @@ export function loadRun(filePath: string): SavedRun {
 
 // ── Divergence ─────────────────────────────────────────────────────
 
-function verdictsEqual(
-  a: MoveVerdict | null,
-  b: MoveVerdict | null,
-): boolean {
-  if (a === null && b === null) {return true;}
-  if (a === null || b === null) {return false;}
+function verdictsEqual(a: MoveVerdict | undefined, b: MoveVerdict | undefined): boolean {
+  if (a === undefined && b === undefined) {
+    return true;
+  }
+  if (a === undefined || b === undefined) {
+    return false;
+  }
   return (
     a.outcome === b.outcome &&
     a.confidence === b.confidence &&
@@ -183,13 +186,14 @@ function verdictsEqual(
   );
 }
 
-function proseDiffersAtBeat(
-  saved: PerformedBeat,
-  fresh: PerformedBeat,
-): boolean {
-  if (saved.voices.length !== fresh.voices.length) {return true;}
+function proseDiffersAtBeat(saved: PerformedBeat, fresh: PerformedBeat): boolean {
+  if (saved.voices.length !== fresh.voices.length) {
+    return true;
+  }
   for (let i = 0; i < saved.voices.length; i += 1) {
-    if (saved.voices[i].output !== fresh.voices[i].output) {return true;}
+    if (saved.voices[i].output !== fresh.voices[i].output) {
+      return true;
+    }
   }
   return false;
 }
@@ -200,10 +204,7 @@ function proseDiffersAtBeat(
  * canonical "did not reproduce" predicate. Environmental drift surfaces
  * as a warning; prose drift is informational only.
  */
-export function detectDivergence(
-  saved: Performance,
-  fresh: Performance,
-): DivergenceReport {
+export function detectDivergence(saved: Performance, fresh: Performance): DivergenceReport {
   if (saved.scoreId !== fresh.scoreId) {
     return {
       structural: true,
@@ -252,7 +253,9 @@ export function detectDivergence(
       });
     }
 
-    if (proseDiffersAtBeat(s, f)) {prose += 1;}
+    if (proseDiffersAtBeat(s, f)) {
+      prose += 1;
+    }
   }
 
   return { structural: false, semantic, environmental, prose };

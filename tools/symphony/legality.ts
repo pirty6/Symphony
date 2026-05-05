@@ -61,10 +61,7 @@ const RULES: readonly LegalityRule[] = [
  * Returns the legality of a single (level, instrument) pair.
  * Defaults to `legal` for any pair not explicitly listed in RULES.
  */
-export function pairLegality(
-  level: Level,
-  instrument: InstrumentType,
-): Legality {
+export function pairLegality(level: Level, instrument: InstrumentType): Legality {
   for (const rule of RULES) {
     if (rule.level === level && rule.instrument === instrument) {
       return rule.verdict;
@@ -74,20 +71,17 @@ export function pairLegality(
 }
 
 /**
- * Looks up the human-readable rationale for a non-legal pair, or null
+ * Looks up the human-readable rationale for a non-legal pair, or undefined
  * if the pair is `legal`. Useful when the validator or planner needs
  * to explain a rejection or penalty in a Performance log.
  */
-export function pairRationale(
-  level: Level,
-  instrument: InstrumentType,
-): string | null {
+export function pairRationale(level: Level, instrument: InstrumentType): string | undefined {
   for (const rule of RULES) {
     if (rule.level === level && rule.instrument === instrument) {
       return rule.rationale;
     }
   }
-  return null;
+  return undefined;
 }
 
 /**
@@ -95,23 +89,21 @@ export function pairRationale(
  * `unusual` if at least one is unusual and none is illegal,
  * `legal` otherwise.
  */
-export function beatLegality(
-  level: Level,
-  voices: readonly Voice[],
-): Legality {
+export function beatLegality(level: Level, voices: readonly Voice[]): Legality {
   let worst: Legality = "legal";
   for (const v of voices) {
     const l = pairLegality(level, v.instrument);
-    if (l === "illegal") {return "illegal";}
-    if (l === "unusual") {worst = "unusual";}
+    if (l === "illegal") {
+      return "illegal";
+    }
+    if (l === "unusual") {
+      worst = "unusual";
+    }
   }
   return worst;
 }
 
 /** Convenience boolean for the score validator's hard reject path. */
-export function isLegalBeat(
-  level: Level,
-  voices: readonly Voice[],
-): boolean {
+export function isLegalBeat(level: Level, voices: readonly Voice[]): boolean {
   return beatLegality(level, voices) !== "illegal";
 }
