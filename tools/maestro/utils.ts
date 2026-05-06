@@ -86,6 +86,40 @@ export function emitDoneAndExit(state: EngineState): void {
 }
 
 /**
+ * Writes the planned `AlgorithmInput` to `outPath` and emits a JSON
+ * envelope on stdout, then exits with code `0`. Used by `maestro plan`
+ * when the engine reached its plan-only terminal state at the go-gate.
+ *
+ * Exits with code `1` if `state.kind !== "planned"` — this must only be
+ * called on the matching terminal state.
+ */
+export function emitPlannedAndExit(state: EngineState, outPath: string): void {
+  if (state.kind !== "planned") {
+    process.stderr.write(`expected planned state; got ${state.kind}\n`);
+    process.exit(1);
+  }
+  fs.mkdirSync(path.dirname(outPath), { recursive: true });
+  fs.writeFileSync(
+    outPath,
+    JSON.stringify(state.algorithm, undefined, 2) + "\n",
+    "utf8",
+  );
+  process.stdout.write(
+    JSON.stringify(
+      {
+        status: "planned",
+        out: outPath,
+        steps: state.algorithm.steps.length,
+        provenance: state.algorithm.provenance,
+      },
+      undefined,
+      2,
+    ) + "\n",
+  );
+  process.exit(0);
+}
+
+/**
  * Persists the engine state to disk as pretty-printed JSON, creating
  * parent directories as needed.
  *

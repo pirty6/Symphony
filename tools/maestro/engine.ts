@@ -29,7 +29,7 @@ import type {
   PerformedBeat,
   PerformedVoice,
 } from "../symphony/types";
-import { compileScore } from "../compiler/compile";
+import { compileScore, algorithmFromPattern } from "../compiler/compile";
 import { scaffoldPerformance } from "../symphony/perform";
 import {
   VOICE_PRODUCERS as RUNNER_VOICE_PRODUCERS,
@@ -47,6 +47,7 @@ import {
   defaultPauseIdFactory,
   emitDoneAndExit,
   emitPauseAndExit,
+  emitPlannedAndExit,
   readState,
   writeState,
 } from "./utils";
@@ -87,8 +88,60 @@ export function runStart(prompt: string, pattern: string, stateFile: string): vo
     emitPauseAndExit(state);
     return;
   }
+  if (state.kind === "planned") {
+    // createEngine never reaches go-gate, so this branch is unreachable
+    // in practice. Guard it anyway to keep the union exhaustive.
+    appendLog("maestro", "start", "output", { kind: "planned" });
+    emitPlannedAndExit(state, state.outPath ?? "");
+    return;
+  }
   appendLog("maestro", "start", "output", { kind: "done" });
   emitDoneAndExit(state);
+}
+
+/**
+ * Same shape as `runStart` but seeds the engine with `planOnly: true`
+ * and an `outPath`. The first pause is identical (confirm-fit or
+ * classify-complexity); the divergence happens at the go-gate, where
+ * the engine emits an `AlgorithmInput` instead of compiling a Score.
+ */
+export function runPlan(
+  prompt: string,
+  pattern: string,
+  stateFile: string,
+  outPath: string,
+): void {
+  appendLog("maestro", "plan", "input", { prompt, pattern, stateFile, outPath });
+  const state = createEngine({
+    prompt,
+    pattern,
+    patterns: listPatterns(),
+    planOnly: true,
+    outPath,
+  });
+  if (state.kind === "failed") {
+    appendLog("maestro", "plan", "output", { kind: "failed", error: state.error });
+    process.stderr.write(`ENGINE ERROR: ${state.error}\n`);
+    process.exit(1);
+  }
+  writeState(stateFile, state);
+  if (state.kind === "running") {
+    appendLog("maestro", "plan", "output", {
+      kind: "running",
+      pauseKind: state.pause.kind,
+      pauseId: state.pause.pauseId,
+    });
+    emitPauseAndExit(state);
+    return;
+  }
+  if (state.kind === "planned") {
+    appendLog("maestro", "plan", "output", { kind: "planned" });
+    emitPlannedAndExit(state, state.outPath ?? outPath);
+    return;
+  }
+  // `done` is unreachable from createEngine in plan mode; surface as failure.
+  process.stderr.write(`ENGINE ERROR: unexpected terminal state '${state.kind}' from plan start\n`);
+  process.exit(1);
 }
 
 export function runResolve(stateFile: string, resolutionRaw: string): void {
@@ -122,6 +175,17 @@ export function runResolve(stateFile: string, resolutionRaw: string): void {
   if (next.kind === "done") {
     appendLog("maestro", "resolve", "output", { kind: "done" });
     emitDoneAndExit(next);
+    return;
+  }
+  if (next.kind === "planned") {
+    appendLog("maestro", "resolve", "output", { kind: "planned", outPath: next.outPath });
+    if (!next.outPath || next.outPath.length === 0) {
+      process.stderr.write(
+        `ENGINE ERROR: planned state has no outPath (state file was not seeded by 'maestro plan'?)\n`,
+      );
+      process.exit(1);
+    }
+    emitPlannedAndExit(next, next.outPath);
     return;
   }
   appendLog("maestro", "resolve", "output", {
@@ -160,6 +224,8 @@ export function createEngine(config: EngineConfig): EngineState {
     score: undefined,
     performedBeats: [],
     startedAt: clock(),
+    planOnly: config.planOnly ?? false,
+    ...(config.outPath !== undefined ? { outPath: config.outPath } : {}),
   };
 
   if (pattern === "new") {
@@ -344,6 +410,24 @@ function resolveGoGate(
   const phrase = res.phrase.trim().toLowerCase();
   if (!(MAESTRO_GO_PHRASES as readonly string[]).includes(phrase)) {
     return runningPause(internal, makeGoGatePause(activePattern, internal.context, nid));
+  }
+  // Plan-only mode: emit AlgorithmInput as the handoff artifact and
+  // stop. `symphony parse` + `symphony perform` finish the run.
+  if (internal.planOnly) {
+    try {
+      const algorithm = algorithmFromPattern(activePattern, {
+        problem: internal.prompt,
+        context: internal.context,
+        generatedAt: clock(),
+      });
+      return {
+        kind: "planned",
+        algorithm,
+        ...(internal.outPath !== undefined ? { outPath: internal.outPath } : {}),
+      };
+    } catch (e) {
+      return failed(`go-gate: algorithmFromPattern failed: ${(e as Error).message}`);
+    }
   }
   let score: ExecutableScore;
   try {

@@ -52,6 +52,17 @@ export interface AlgorithmAnnotation {
   readonly instrument: InstrumentType;
 }
 
+/**
+ * Provenance metadata recorded on an `AlgorithmInput` when it was
+ * derived from a registered (or freshly drafted) Pattern. Carried
+ * through to the resulting `ExecutableScore.pattern` so a saved run
+ * can be traced back to the pattern that authored it.
+ */
+export interface AlgorithmProvenance {
+  /** Pattern name as on `PatternScore.pattern`. */
+  readonly pattern: string;
+}
+
 export interface AlgorithmInput {
   /** Raw user prompt; fed to fingerprintProblem. */
   readonly problem: string;
@@ -59,29 +70,31 @@ export interface AlgorithmInput {
   readonly domain: DomainKey;
   readonly steps: readonly AlgorithmStep[];
   readonly annotations: readonly AlgorithmAnnotation[];
+  /**
+   * Repo-specific knobs the executing agent reads alongside each
+   * directive. Propagated verbatim to `ExecutableScore.context`.
+   */
+  readonly context?: Readonly<Record<string, unknown>>;
+  /** Optional provenance: which pattern (if any) authored this algorithm. */
+  readonly provenance?: AlgorithmProvenance;
   readonly generatedAt?: string;
 }
 
 // ── Derivation ─────────────────────────────────────────────────────
 
-function buildFrequencyMap(beats: readonly Beat[], domain: DomainKey): FrequencyMap {
+function buildFrequencyMap(
+  beats: readonly Beat[],
+  domain: DomainKey,
+): FrequencyMap {
   const counts: Record<Level, number> = {
-    1: 0,
-    2: 0,
-    3: 0,
-    4: 0,
-    5: 0,
-    6: 0,
-    7: 0,
-    8: 0,
+    1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0,
   };
-  for (const beat of beats) {
-    counts[beat.level] += 1;
-  }
+  for (const beat of beats) {counts[beat.level] += 1;}
   const total = beats.length;
 
-  const activeLevels =
-    total === 0 ? [] : LEVELS.filter((l) => counts[l] / total >= LEVEL_ACTIVITY_THRESHOLD);
+  const activeLevels = total === 0
+    ? []
+    : LEVELS.filter((l) => counts[l] / total >= LEVEL_ACTIVITY_THRESHOLD);
 
   return { key: domain, activeLevels };
 }
@@ -123,7 +136,9 @@ export function compileScore(pattern: Pattern, args: CompileArgs): ExecutableSco
       value === null ||
       (typeof value === "string" && value.trim().length === 0)
     ) {
-      throw new Error(`compileScore: pattern "${pattern.score.pattern}" requires context.${key}`);
+      throw new Error(
+        `compileScore: pattern "${pattern.score.pattern}" requires context.${key}`,
+      );
     }
   }
 
@@ -160,7 +175,9 @@ export function parseAlgorithm(input: AlgorithmInput): ExecutableScore {
   const annotationsByVerb = new Map<string, AlgorithmAnnotation>();
   for (const annotation of input.annotations) {
     if (annotationsByVerb.has(annotation.verb)) {
-      throw new Error(`parseAlgorithm: duplicate annotation for verb "${annotation.verb}"`);
+      throw new Error(
+        `parseAlgorithm: duplicate annotation for verb "${annotation.verb}"`,
+      );
     }
     annotationsByVerb.set(annotation.verb, annotation);
   }
@@ -169,7 +186,9 @@ export function parseAlgorithm(input: AlgorithmInput): ExecutableScore {
   const beats: Beat[] = input.steps.map((step) => {
     const annotation = annotationsByVerb.get(step.verb);
     if (!annotation) {
-      throw new Error(`parseAlgorithm: step "${step.verb}" has no matching annotation`);
+      throw new Error(
+        `parseAlgorithm: step "${step.verb}" has no matching annotation`,
+      );
     }
     usedVerbs.add(step.verb);
     const voices: readonly Voice[] = [{ instrument: annotation.instrument }];
@@ -178,21 +197,91 @@ export function parseAlgorithm(input: AlgorithmInput): ExecutableScore {
 
   for (const verb of annotationsByVerb.keys()) {
     if (!usedVerbs.has(verb)) {
-      throw new Error(`parseAlgorithm: annotation "${verb}" has no matching step`);
+      throw new Error(
+        `parseAlgorithm: annotation "${verb}" has no matching step`,
+      );
     }
   }
 
   const frequencyMap = buildFrequencyMap(beats, input.domain);
   const generatedFrom = fingerprintProblem(input.problem);
 
-  const partial: Omit<ExecutableScore, "id" | "generatedAt"> = {
+  const base: Omit<ExecutableScore, "id" | "generatedAt"> = {
     schemaVersion: 1,
     frequencyMap,
     beats,
     generatedFrom,
   };
+  const partial: Omit<ExecutableScore, "id" | "generatedAt"> = {
+    ...base,
+    ...(input.provenance ? { pattern: input.provenance.pattern } : {}),
+    ...(input.context ? { context: { ...input.context } } : {}),
+  };
   const id = computeExecutableScoreId(partial);
   const generatedAt = input.generatedAt ?? new Date().toISOString();
 
   return { ...partial, id, generatedAt };
+}
+
+// ── Pattern → AlgorithmInput (uniform handoff) ─────────────────────
+
+/**
+ * Derive a free-form `AlgorithmInput` from a Pattern + concrete inputs.
+ *
+ * Mirrors `compileScore` — same context validation, same beat→step
+ * mapping — but emits the lower-level Algorithm shape instead of a
+ * compiled Score. Used by `maestro plan` to write an editable
+ * `algorithm.json` artifact that `symphony parse` consumes.
+ *
+ * Provenance (`{ pattern: pattern.score.pattern }`) is attached so
+ * the resulting Score can still be traced back to the authoring
+ * Pattern even though the handoff format is uniform.
+ */
+export function algorithmFromPattern(pattern: Pattern, args: CompileArgs): AlgorithmInput {
+  const context = args.context ?? {};
+  for (const key of pattern.requiredContext) {
+    const value = context[key];
+    if (
+      value === undefined ||
+      value === null ||
+      (typeof value === "string" && value.trim().length === 0)
+    ) {
+      throw new Error(
+        `algorithmFromPattern: pattern "${pattern.score.pattern}" requires context.${key}`,
+      );
+    }
+  }
+  const steps: readonly AlgorithmStep[] = pattern.score.beats.map((pb) => ({
+    verb: pb.step,
+    directive: pb.directive,
+  }));
+  // Annotations are unique per verb. A pattern may legally repeat a
+  // step name across beats only if the (level, instrument) tuple
+  // matches; otherwise the algorithm is ambiguous and parseAlgorithm
+  // would reject it downstream — surface that here instead.
+  const seen = new Map<string, AlgorithmAnnotation>();
+  for (const pb of pattern.score.beats) {
+    const prior = seen.get(pb.step);
+    const next: AlgorithmAnnotation = {
+      verb: pb.step,
+      level: pb.level,
+      instrument: pb.instrument,
+    };
+    if (prior && (prior.level !== next.level || prior.instrument !== next.instrument)) {
+      throw new Error(
+        `algorithmFromPattern: pattern "${pattern.score.pattern}" has step "${pb.step}" with conflicting (level, instrument) across beats`,
+      );
+    }
+    seen.set(pb.step, next);
+  }
+  const annotations: readonly AlgorithmAnnotation[] = Array.from(seen.values());
+  return {
+    problem: args.problem,
+    domain: pattern.score.domain,
+    steps,
+    annotations,
+    context: { ...context },
+    provenance: { pattern: pattern.score.pattern },
+    ...(args.generatedAt ? { generatedAt: args.generatedAt } : {}),
+  };
 }

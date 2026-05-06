@@ -18,6 +18,14 @@
  *     `--pattern` is required: pass a registered pattern name (see
  *     `symphony list-patterns`) or "new" to draft a fresh one.
  *
+ *   maestro plan    --prompt <text> --pattern <name|new> --state <file> --out <algorithm.json>
+ *     Same multi-turn flow as `start`, but the engine stops at the
+ *     go-gate and writes an `AlgorithmInput` JSON to `--out` instead
+ *     of compiling a Score and entering perform-beat. The handoff is
+ *     finished by `symphony parse` (algorithm → score) +
+ *     `symphony perform` (score + inputs → performance). Exit 0 means
+ *     the algorithm was written; exit 2 means another Pause is pending.
+ *
  *   maestro resolve --state <file> (--resolution <json> | --resolution-file <path>)
  *     Apply one Resolution. Updates --state in place. Prints next
  *     Pause (exit 2) or final Performance (exit 0) or error (exit 1).
@@ -34,7 +42,7 @@
 import * as fs from "node:fs";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
-import { runStart, runResolve } from "./engine";
+import { runStart, runResolve, runPlan } from "./engine";
 
 // ── CLI definition ─────────────────────────────────
 
@@ -66,6 +74,37 @@ function maestroCli(): void {
           }),
       ({ prompt, pattern, state }) => {
         runStart(prompt, pattern, state);
+      },
+    )
+    .command(
+      "plan",
+      "Same as `start` but stops at the go-gate and writes an AlgorithmInput JSON to --out (handoff to `symphony parse` + `symphony perform`)",
+      (y) =>
+        y
+          .option("prompt", {
+            describe: "User prompt to seed the engine with",
+            type: "string",
+            demandOption: true,
+          })
+          .option("pattern", {
+            describe:
+              "Registered pattern name (see `symphony list-patterns`) or 'new' to draft a fresh pattern",
+            type: "string",
+            demandOption: true,
+          })
+          .option("state", {
+            describe: "Path to write opaque engine state to (created if missing)",
+            type: "string",
+            demandOption: true,
+          })
+          .option("out", {
+            describe:
+              "Path the AlgorithmInput JSON will be written to once the engine reaches the go-gate",
+            type: "string",
+            demandOption: true,
+          }),
+      ({ prompt, pattern, state, out }) => {
+        runPlan(prompt, pattern, state, out);
       },
     )
     .command(

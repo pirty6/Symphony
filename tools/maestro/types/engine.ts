@@ -1,4 +1,5 @@
 import type { Pattern } from "../../patterns";
+import type { AlgorithmInput } from "../../compiler/compile";
 import type { ExecutableScore, Performance, PerformedBeat } from "../../symphony/types";
 import type { Pause } from "./pause";
 
@@ -13,6 +14,20 @@ export interface EngineConfig {
    * engine; the engine itself does not route.
    */
   readonly pattern: string;
+  /**
+   * When `true`, the engine stops at the go-gate and emits an
+   * `AlgorithmInput` instead of compiling a Score and entering the
+   * perform-beat phase. The handoff is finished by `symphony parse` +
+   * `symphony perform`. Used by the `maestro plan` subcommand.
+   */
+  readonly planOnly?: boolean;
+  /**
+   * Filesystem path the CLI will write the emitted `AlgorithmInput`
+   * to when the engine reaches `planned`. Plumbed through state so a
+   * single `--out` on `maestro plan` survives the multi-turn
+   * `start`→`resolve` round-trip without re-supplying it.
+   */
+  readonly outPath?: string;
   /** Optional clock injector used for startedAt. */
   readonly clock?: () => string;
   /** Optional pauseId generator. Defaults to crypto.randomUUID. Tests inject a deterministic factory. */
@@ -35,13 +50,21 @@ export interface InternalState {
   readonly score: ExecutableScore | undefined;
   readonly performedBeats: readonly PerformedBeat[];
   readonly startedAt: string;
+  /**
+   * Mirror of `EngineConfig.planOnly`. Persisted in state so the
+   * decision survives the `start`→`resolve` round-trip.
+   */
+  readonly planOnly: boolean;
+  /** Mirror of `EngineConfig.outPath`. Only meaningful when `planOnly`. */
+  readonly outPath?: string;
 }
 
 type Running = "running";
 type Done = "done";
+type Planned = "planned";
 type Failed = "failed";
 
-type Kind = Running | Done | Failed;
+type Kind = Running | Done | Planned | Failed;
 
 type EngineStateBase = {
   readonly kind: Kind;
@@ -58,9 +81,21 @@ type DoneState = EngineStateBase & {
   readonly result: EngineResult;
 };
 
+/**
+ * Terminal state reached when the engine was started with
+ * `planOnly: true` and the user said "go" at the go-gate. The
+ * `algorithm` is the handoff artifact for `symphony parse`, and
+ * `outPath` is the file path the CLI will write it to.
+ */
+type PlannedState = EngineStateBase & {
+  readonly kind: Planned;
+  readonly algorithm: AlgorithmInput;
+  readonly outPath?: string;
+};
+
 type FailedState = EngineStateBase & {
   readonly kind: Failed;
   readonly error: string;
 };
 
-export type EngineState = RunningState | DoneState | FailedState;
+export type EngineState = RunningState | DoneState | PlannedState | FailedState;
