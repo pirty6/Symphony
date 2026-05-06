@@ -82,6 +82,71 @@ Each Pause carries `{ kind, pauseId, payload, composerPrompt, instrumentPrompt }
 The `composerPrompt` is the question the engine is asking you. The Pause
 `kind` tells you exactly which Resolution shape to send back.
 
+### How to spawn a sub-agent
+
+Throughout this document, "spawn `maestro-assessor`" / "spawn
+`maestro-executor`" / "spawn proposer / skeptic / pragmatist /
+template-critic" all mean the same concrete action: invoke the
+`runSubagent` tool with the corresponding `agentName`.
+
+```
+runSubagent({
+  agentName: "maestro-assessor",   // or maestro-executor, maestro-proposer, …
+  description: "<3-5 word task label>",
+  prompt: "<INSTRUMENT_INSTRUCTIONS block — what the sub-agent should do and what shape to return>",
+})
+```
+
+The sub-agent runs to completion and returns a single final report.
+That report's text is what you place into the `voice.output` field of
+the corresponding `perform-beat` Resolution (or into the `nextDraft`
+of a `draft-pattern-round` Resolution, depending on the Pause).
+
+You are running inside the host's agent runtime. **`runSubagent` is
+always available to you** — it is the tool the YAML frontmatter's
+`agents: […]` list grants you. If you ever conclude "I can't spawn
+sub-agents in this environment," that is a misread of your toolset.
+Re-check; don't fall back to producing voice outputs yourself.
+Producing the output yourself and tagging it `producedBy:
+"maestro-assessor"` is the protocol violation called out below.
+
+### Fallback: when `runSubagent` is genuinely missing
+
+Some host runtimes do not expose `runSubagent` to nested subagents
+(e.g. depth-2 spawns in VS Code Copilot today). In that case — and
+**only** in that case, after you have actually attempted to call
+`runSubagent` and it was not found in your tool registry — you must
+not fabricate voice outputs. Instead, hand control back to the outer
+agent that invoked you and ask it to spawn on your behalf.
+
+Stop the engine cleanly at the current pause (the state file already
+preserves it) and return your final report in this exact shape so the
+outer agent can act on it without parsing prose:
+
+```
+NEEDS_OUTER_SPAWN
+stateFile: <absolute path to engine state file>
+pauseKind: <perform-beat | draft-pattern-round>
+pauseId:   <uuid the outer agent must echo>
+spawn:
+  - agentName: <maestro-assessor | maestro-executor | maestro-proposer | …>
+    prompt: |
+      <verbatim INSTRUMENT_INSTRUCTIONS for that sub-agent>
+nextResolutionTemplate: |
+  <the JSON resolution shape you want sent back, with placeholders
+   like "{{output_of_spawn_0}}" where the sub-agent's report should
+   be substituted>
+```
+
+The outer agent will then: spawn each requested sub-agent via its own
+`runSubagent`, substitute the returned text into the resolution
+template, run `npx tsx tools/maestro/cli.ts resolve --state <stateFile>
+--resolution-file <file>`, and re-invoke you to handle the next pause.
+This preserves the `producedBy` contract — the sub-agent's literal
+output still becomes the voice output, just routed through one extra
+hop. Do this only as a documented fallback; the primary path remains
+spawning directly with your own `runSubagent` tool.
+
 ### `pauseId` is mandatory on every Resolution
 
 The engine assigns a fresh uuid to every Pause. Your Resolution must

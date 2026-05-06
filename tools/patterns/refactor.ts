@@ -16,56 +16,56 @@ const score: PatternScore = {
     {
       step: "name",
       level: 1,
-      instrument: "percussion",
+      instrument: "order",
       directive:
         "Name target — concretely. The structural change to perform (rename, merge, extract, move, etc.) is in context.target.",
     },
     {
       step: "pin",
       level: 4,
-      instrument: "brass",
+      instrument: "decide",
       directive:
         "Pin invariant — the behavior contract preserved across the change is in context.invariant. State what is allowed to change (import paths, file layout, internal names).",
     },
     {
       step: "survey",
       level: 3,
-      instrument: "strings",
+      instrument: "analyze",
       directive:
         "Survey blast radius — enumerate every reference. Distinguish symbol-level (imports, calls, type usages — AST/LSP) from string-level (docs, comments, configs, serialized data, log queries — only grep + human reading finds these). Renames and splits fail silently when string-level surveys are skipped.",
     },
     {
       step: "capture",
       level: 1,
-      instrument: "percussion",
+      instrument: "order",
       directive:
         "Capture baseline — run tests, types, and build BEFORE any edit on the surface this refactor touches. Record the green state. context.baselineCommand may pin the exact command. If red on the touched surface, halt.",
     },
     {
       step: "plan",
       level: 3,
-      instrument: "percussion",
+      instrument: "order",
       directive:
         "Plan move — describe the sequence of mechanical edits in order (introduce new name → update call sites → relocate → delete shim) and mark reversible checkpoints between them. For merge/consolidate, prove behavioral equivalence first.",
     },
     {
       step: "execute",
       level: 2,
-      instrument: "percussion",
+      instrument: "order",
       directive:
         "Execute edits — apply the plan in order. Tag any scaffolding (deprecation shim, alias, parallel implementation) at the moment of introduction so pruning is mechanical.",
     },
     {
       step: "verify",
       level: 4,
-      instrument: "piano",
+      instrument: "integrate",
       directive:
         "Verify equivalence — re-run the baseline commands covering the survey surface from beat 'survey'. Integration tests outside the default run may need to be triggered explicitly.",
     },
     {
       step: "prune",
       level: 2,
-      instrument: "brass",
+      instrument: "decide",
       directive:
         "Prune scaffolding — remove every item tagged in beat 'execute'. Re-verify equivalence. Dead aliases rot quickly and the second pass rarely happens.",
     },

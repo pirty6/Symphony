@@ -5,13 +5,14 @@
  * pin every gate that, in the previous markdown-only maestro, an LLM
  * could (and did) skip:
  *
- *   - verb-match routing                          → must produce match-pattern pause
- *   - confirm-fit reroute                         → re-enters phase 1 cleanly
- *   - elicit-context refuses empty values         → footnote-class control-flow gate
- *   - go-gate refuses vague positive language     → only canonical phrases advance
- *   - draft-pattern hard MAX_ROUNDS=6             → terminal failure, no backdoor
- *   - perform-beat shape validation               → THE footnote bug
- *   - completed Performance has correct shape     → integration with scaffoldPerformance
+ *   - createEngine requires explicit pattern pick      → routing is external
+ *   - confirm-fit reroute / fail-without-reroute        → re-enters phase 1 cleanly
+ *   - elicit-context refuses empty values              → footnote-class control-flow gate
+ *   - go-gate refuses vague positive language          → only canonical phrases advance
+ *   - classify-complexity → draft-pattern-round 1       → pattern="new" entry path
+ *   - draft-pattern hard MAX_ROUNDS=6                   → terminal failure, no backdoor
+ *   - perform-beat shape validation                     → THE footnote bug
+ *   - completed Performance has correct shape           → integration with scaffoldPerformance
  */
 
 import { createEngine, advance, MAESTRO_GO_PHRASES } from "./engine";
@@ -29,7 +30,7 @@ function expectPause<K extends Pause["kind"]>(
   if (state.kind !== "running") {
     throw new Error(
       `expected running state with pause '${kind}', got ${state.kind}: ${
-        state.kind === "failed" ? state.error : "done"
+        state.kind === "failed" ? state.error : state.kind
       }`,
     );
   }
@@ -46,37 +47,38 @@ function pid(state: ReturnType<typeof createEngine>): string {
   return state.pause.pauseId;
 }
 
-// ── Phase 1: match-pattern ─────────────────────────────────────────
+// ── createEngine routing entry-points ──────────────────────────────
 
-describe("match-pattern routing", () => {
-  test("single verb match auto-advances to confirm-fit", () => {
+describe("createEngine entry-points", () => {
+  test("registered pattern name → first pause is confirm-fit", () => {
     const s0 = createEngine({
       prompt: "rename loadScore to loadExecutableScore",
       patterns: allPatterns,
+      pattern: "refactor",
     });
-    // 'rename' uniquely matches refactor → engine skips match-pattern pause.
-    expectPause(s0, "confirm-fit");
+    const pause = expectPause(s0, "confirm-fit");
+    expect(pause.payload.pattern).toBe("refactor");
   });
 
-  test("ambiguous prompt produces match-pattern pause with all candidates", () => {
-    const s0 = createEngine({
-      // 'add' matches feature; 'understand' matches investigate. Two candidates.
-      prompt: "understand and add a debounce to the input field",
-      patterns: allPatterns,
-    });
-    const pause = expectPause(s0, "match-pattern");
-    const names = pause.payload.candidates.map((c) => c.pattern).sort();
-    expect(names).toEqual(["feature", "investigate"]);
-  });
-
-  test("no verb match transitions straight into draft-pattern-round 1", () => {
+  test("pattern='new' → first pause is classify-complexity", () => {
     const s0 = createEngine({
       prompt: "frobnicate the widget cluster",
       patterns: allPatterns,
+      pattern: "new",
     });
-    const pause = expectPause(s0, "draft-pattern-round");
-    expect(pause.payload.round).toBe(1);
-    expect(pause.payload.priorDraft).toBeNull();
+    expectPause(s0, "classify-complexity");
+  });
+
+  test("unknown pattern name → engine fails", () => {
+    const s0 = createEngine({
+      prompt: "anything",
+      patterns: allPatterns,
+      pattern: "nonexistent-pattern",
+    });
+    expect(s0.kind).toBe("failed");
+    if (s0.kind === "failed") {
+      expect(s0.error).toMatch(/not registered/);
+    }
   });
 });
 
@@ -87,6 +89,7 @@ describe("confirm-fit", () => {
     const s0 = createEngine({
       prompt: "rename loadScore to loadExecutableScore",
       patterns: allPatterns,
+      pattern: "refactor",
     });
     const s1 = advance(s0, { kind: "confirm-fit", pauseId: pid(s0), ok: true });
     const pause = expectPause(s1, "elicit-context");
@@ -98,6 +101,7 @@ describe("confirm-fit", () => {
     const s0 = createEngine({
       prompt: "rename loadScore to loadExecutableScore",
       patterns: allPatterns,
+      pattern: "refactor",
     });
     const s1 = advance(s0, {
       kind: "confirm-fit",
@@ -111,23 +115,26 @@ describe("confirm-fit", () => {
     expect(pause.payload.pattern).toBe("investigate");
   });
 
-  test("ok=false without reroute re-emits match-pattern listing all patterns", () => {
+  test("ok=false without reroute fails the engine (routing is external)", () => {
     const s0 = createEngine({
       prompt: "rename loadScore to loadExecutableScore",
       patterns: allPatterns,
+      pattern: "refactor",
     });
     const s1 = advance(s0, { kind: "confirm-fit", pauseId: pid(s0), ok: false });
-    // User said wrong pattern but doesn't yet know which. Engine offers
-    // every registered pattern as a candidate (or 'no-match' to draft).
-    const pause = expectPause(s1, "match-pattern");
-    const names = pause.payload.candidates.map((c) => c.pattern).sort();
-    expect(names).toEqual(["feature", "investigate", "refactor"]);
+    // Routing happens outside the engine; the only honest response is to fail
+    // so the agent restarts with a new --pattern.
+    expect(s1.kind).toBe("failed");
+    if (s1.kind === "failed") {
+      expect(s1.error).toMatch(/reroute|restart/);
+    }
   });
 
   test("reroute to unknown pattern fails the engine", () => {
     const s0 = createEngine({
       prompt: "rename loadScore to loadExecutableScore",
       patterns: allPatterns,
+      pattern: "refactor",
     });
     const s1 = advance(s0, {
       kind: "confirm-fit",
@@ -149,6 +156,7 @@ describe("elicit-context", () => {
     const s0 = createEngine({
       prompt: "rename loadScore to loadExecutableScore",
       patterns: allPatterns,
+      pattern: "refactor",
     });
     return advance(s0, { kind: "confirm-fit", pauseId: pid(s0), ok: true });
   }
@@ -207,6 +215,7 @@ describe("go-gate", () => {
     const s0 = createEngine({
       prompt: "rename loadScore to loadExecutableScore",
       patterns: allPatterns,
+      pattern: "refactor",
     });
     const s1 = advance(s0, { kind: "confirm-fit", pauseId: pid(s0), ok: true });
     return advance(s1, {
@@ -239,9 +248,9 @@ describe("go-gate", () => {
   });
 });
 
-// ── Phase 1.3: draft-pattern hard cap ──────────────────────────────
+// ── Phase 1.3: classify-complexity → draft-pattern hard cap ────────
 
-describe("draft-pattern MAX_ROUNDS", () => {
+describe("draft-pattern flow", () => {
   function makeStubPattern(name: string): Pattern {
     return {
       score: {
@@ -251,21 +260,58 @@ describe("draft-pattern MAX_ROUNDS", () => {
           {
             step: "stub",
             level: 3,
-            instrument: "piano",
+            instrument: "integrate",
             directive: "stub directive",
           },
         ],
       },
-      verbTriggers: [name],
+      description: "stub pattern for tests",
       requiredContext: [],
     };
   }
 
-  test("terminates at round 6 with failed engine state", () => {
+  test("classify-complexity → draft-pattern-round 1 with chosen complexity", () => {
+    const s0 = createEngine({
+      prompt: "frobnicate the widget cluster",
+      patterns: allPatterns,
+      pattern: "new",
+    });
+    expectPause(s0, "classify-complexity");
+    const s1 = advance(s0, {
+      kind: "classify-complexity",
+      pauseId: pid(s0),
+      complexity: 2,
+    });
+    const pause = expectPause(s1, "draft-pattern-round");
+    expect(pause.payload.round).toBe(1);
+    expect(pause.payload.baseHint).toBe(2);
+    expect(pause.payload.priorDraft).toBeUndefined();
+  });
+
+  test("classify-complexity rejects out-of-range value", () => {
+    const s0 = createEngine({
+      prompt: "frobnicate the widget cluster",
+      patterns: allPatterns,
+      pattern: "new",
+    });
+    const s1 = advance(s0, {
+      kind: "classify-complexity",
+      pauseId: pid(s0),
+      complexity: 5 as unknown as 1 | 2 | 3 | 4,
+    });
+    expect(s1.kind).toBe("failed");
+    if (s1.kind === "failed") {
+      expect(s1.error).toMatch(/complexity/);
+    }
+  });
+
+  test("draft-pattern terminates at round 6 with failed engine state", () => {
     let state = createEngine({
       prompt: "frobnicate the widget cluster",
       patterns: allPatterns,
+      pattern: "new",
     });
+    state = advance(state, { kind: "classify-complexity", pauseId: pid(state), complexity: 2 });
     for (let i = 0; i < 6; i += 1) {
       const pause = expectPause(state, "draft-pattern-round");
       expect(pause.payload.round).toBe(i + 1);
@@ -279,20 +325,23 @@ describe("draft-pattern MAX_ROUNDS", () => {
   });
 
   test("approve at round 1 transitions out of debate", () => {
-    const s0 = createEngine({
+    let state = createEngine({
       prompt: "frobnicate the widget cluster",
       patterns: allPatterns,
+      pattern: "new",
     });
-    expectPause(s0, "draft-pattern-round");
-    const s1 = advance(s0, {
+    state = advance(state, { kind: "classify-complexity", pauseId: pid(state), complexity: 2 });
+    expectPause(state, "draft-pattern-round");
+    const s1 = advance(state, {
       kind: "draft-pattern-round",
-      pauseId: pid(s0),
+      pauseId: pid(state),
       outcome: "approve",
       nextDraft: makeStubPattern("frobnicate"),
     });
     // After approval, engine treats the new pattern as the active one
-    // and proceeds to confirm-fit (or elicit-context if no requiredContext).
-    expect(["confirm-fit", "go-gate"]).toContain(s1.kind === "running" ? s1.pause.kind : "");
+    // and skips confirm-fit (the user just designed it). With no
+    // requiredContext, it goes straight to go-gate.
+    expectPause(s1, "go-gate");
   });
 });
 
@@ -303,8 +352,9 @@ describe("perform-beat shape validation", () => {
     const s0 = createEngine({
       prompt: "understand the architecture",
       patterns: allPatterns,
+      pattern: "investigate",
     });
-    // 'understand' uniquely matches investigate (no requiredContext).
+    // investigate has no requiredContext → confirm-fit → go-gate.
     const s1 = advance(s0, { kind: "confirm-fit", pauseId: pid(s0), ok: true });
     return advance(s1, { kind: "go-gate", pauseId: pid(s1), phrase: "go" });
   }
@@ -318,7 +368,7 @@ describe("perform-beat shape validation", () => {
       pauseId: pid(s0),
       voiceOutputs: [
         {
-          instrument: "percussion",
+          instrument: "order",
           output: "restated",
           confidence: 0.9,
           producedBy: "maestro-assessor",
@@ -361,7 +411,7 @@ describe("perform-beat shape validation", () => {
       kind: "perform-beat",
       pauseId: pid(s0),
       voiceOutputs: [
-        { instrument: "percussion", output: 42, confidence: 0.9, producedBy: "maestro-assessor" },
+        { instrument: "order", output: 42, confidence: 0.9, producedBy: "maestro-assessor" },
       ],
       verdict: {
         outcome: "applied",
@@ -380,7 +430,7 @@ describe("perform-beat shape validation", () => {
       kind: "perform-beat",
       pauseId: pid(s0),
       voiceOutputs: [
-        { instrument: "percussion", output: "x", confidence: 1.5, producedBy: "maestro-assessor" },
+        { instrument: "order", output: "x", confidence: 1.5, producedBy: "maestro-assessor" },
       ],
       verdict: {
         outcome: "applied",
@@ -399,7 +449,7 @@ describe("perform-beat shape validation", () => {
       pauseId: pid(s0),
       voiceOutputs: [
         {
-          instrument: "percussion",
+          instrument: "order",
           output: "couldnt",
           confidence: 0.2,
           producedBy: "maestro-assessor",
@@ -426,6 +476,7 @@ describe("EngineState JSON round-trip", () => {
     const s0 = createEngine({
       prompt: "rename loadScore to loadExecutableScore",
       patterns: allPatterns,
+      pattern: "refactor",
     });
     const roundTripped = JSON.parse(JSON.stringify(s0)) as typeof s0;
     expect(roundTripped.kind).toBe("running");
@@ -438,6 +489,7 @@ describe("EngineState JSON round-trip", () => {
     let state = createEngine({
       prompt: "understand the codebase",
       patterns: allPatterns,
+      pattern: "investigate",
     });
     state = advance(state, { kind: "confirm-fit", pauseId: pid(state), ok: true });
     state = advance(state, { kind: "go-gate", pauseId: pid(state), phrase: "go" });
@@ -448,7 +500,7 @@ describe("EngineState JSON round-trip", () => {
       kind: "perform-beat",
       pauseId: pid(state),
       voiceOutputs: [
-        { instrument: "percussion", output: "ok", confidence: 0.9, producedBy: "maestro-assessor" },
+        { instrument: "order", output: "ok", confidence: 0.9, producedBy: "maestro-assessor" },
       ],
       verdict: {
         outcome: "applied",
@@ -461,44 +513,6 @@ describe("EngineState JSON round-trip", () => {
   });
 });
 
-// ── Debate complexity hint ─────────────────────────────────────────
-
-describe("debateComplexityHint", () => {
-  test("createEngine without hint defaults round 1 to complexity 2", () => {
-    const s0 = createEngine({
-      prompt: "frobnicate the widget cluster",
-      patterns: allPatterns,
-    });
-    const pause = expectPause(s0, "draft-pattern-round");
-    expect(pause.payload.complexity).toBe(2);
-  });
-
-  test("hint=4 makes round 1 complexity 4 (capped)", () => {
-    const s0 = createEngine({
-      prompt: "frobnicate the widget cluster",
-      patterns: allPatterns,
-      debateComplexityHint: 4,
-    });
-    const pause = expectPause(s0, "draft-pattern-round");
-    expect(pause.payload.complexity).toBe(4);
-  });
-
-  test("hint=1 starts at 1 and escalates each round, capped at 4", () => {
-    let state = createEngine({
-      prompt: "frobnicate the widget cluster",
-      patterns: allPatterns,
-      debateComplexityHint: 1,
-    });
-    const seen: number[] = [];
-    for (let i = 0; i < 6; i += 1) {
-      const pause = expectPause(state, "draft-pattern-round");
-      seen.push(pause.payload.complexity);
-      state = advance(state, { kind: "draft-pattern-round", pauseId: pid(state), outcome: "edit" });
-    }
-    expect(seen).toEqual([1, 2, 3, 4, 4, 4]);
-  });
-});
-
 // ── pauseId idempotency guard ──────────────────────────────────────
 
 describe("pauseId idempotency", () => {
@@ -506,6 +520,7 @@ describe("pauseId idempotency", () => {
     const s0 = createEngine({
       prompt: "rename loadScore to loadExecutableScore",
       patterns: allPatterns,
+      pattern: "refactor",
     });
     // Cast around the type system to simulate a hand-rolled JSON resolution
     // that forgot to echo pauseId.
@@ -520,6 +535,7 @@ describe("pauseId idempotency", () => {
     const s0 = createEngine({
       prompt: "rename loadScore to loadExecutableScore",
       patterns: allPatterns,
+      pattern: "refactor",
     });
     const stalePauseId = pid(s0);
     // First advance consumes the pauseId.
@@ -545,6 +561,7 @@ describe("pauseId idempotency", () => {
     const s0 = createEngine({
       prompt: "rename loadScore to loadExecutableScore",
       patterns: allPatterns,
+      pattern: "refactor",
     });
     const id0 = pid(s0);
     const s1 = advance(s0, { kind: "confirm-fit", pauseId: id0, ok: true });
@@ -558,6 +575,7 @@ describe("pauseId idempotency", () => {
     const s0 = createEngine({
       prompt: "rename loadScore to loadExecutableScore",
       patterns: allPatterns,
+      pattern: "refactor",
     });
     const s1 = advance(s0, { kind: "confirm-fit", pauseId: pid(s0), ok: true });
     const s2 = advance(s1, {
@@ -582,6 +600,7 @@ describe("pauseId idempotency", () => {
     const s0 = createEngine({
       prompt: "rename loadScore to loadExecutableScore",
       patterns: allPatterns,
+      pattern: "refactor",
       pauseIdFactory: factory,
     });
     expect(pid(s0)).toBe("pid-1");
@@ -601,6 +620,7 @@ describe("voiceOutputs.producedBy validation", () => {
     const s0 = createEngine({
       prompt: "understand the architecture",
       patterns: allPatterns,
+      pattern: "investigate",
     });
     const s1 = advance(s0, { kind: "confirm-fit", pauseId: pid(s0), ok: true });
     return advance(s1, { kind: "go-gate", pauseId: pid(s1), phrase: "go" });
@@ -611,7 +631,7 @@ describe("voiceOutputs.producedBy validation", () => {
     const bad = {
       kind: "perform-beat",
       pauseId: pid(s0),
-      voiceOutputs: [{ instrument: "percussion", output: "x", confidence: 0.9 }],
+      voiceOutputs: [{ instrument: "order", output: "x", confidence: 0.9 }],
       verdict: {
         outcome: "applied",
         confidence: 0.9,
@@ -632,7 +652,7 @@ describe("voiceOutputs.producedBy validation", () => {
       kind: "perform-beat",
       pauseId: pid(s0),
       voiceOutputs: [
-        { instrument: "percussion", output: "x", confidence: 0.9, producedBy: "Composer" },
+        { instrument: "order", output: "x", confidence: 0.9, producedBy: "Composer" },
       ],
       verdict: {
         outcome: "applied",
@@ -655,7 +675,7 @@ describe("voiceOutputs.producedBy validation", () => {
       pauseId: pid(s0),
       voiceOutputs: [
         {
-          instrument: "percussion",
+          instrument: "order",
           output: "ok",
           confidence: 0.9,
           producedBy: "maestro-executor",
@@ -683,13 +703,14 @@ describe("resolution kind mismatch", () => {
     const s0 = createEngine({
       prompt: "rename loadScore to loadExecutableScore",
       patterns: allPatterns,
+      pattern: "refactor",
     });
     // s0 is paused on confirm-fit but we submit a perform-beat resolution.
     const s1 = advance(s0, {
       kind: "perform-beat",
       pauseId: pid(s0),
       voiceOutputs: [
-        { instrument: "percussion", output: "x", confidence: 0.9, producedBy: "maestro-assessor" },
+        { instrument: "order", output: "x", confidence: 0.9, producedBy: "maestro-assessor" },
       ],
       verdict: {
         outcome: "applied",
@@ -718,6 +739,7 @@ describe("full run integration", () => {
     let state = createEngine({
       prompt: "understand the codebase",
       patterns: allPatterns,
+      pattern: "investigate",
     });
     state = advance(state, { kind: "confirm-fit", pauseId: pid(state), ok: true });
     state = advance(state, { kind: "go-gate", pauseId: pid(state), phrase: "go" });

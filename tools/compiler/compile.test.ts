@@ -145,8 +145,8 @@ describe("parseAlgorithm", () => {
       { verb: "do", directive: "Do it." },
     ],
     annotations: [
-      { verb: "scope", level: 3, instrument: "percussion" },
-      { verb: "do", level: 4, instrument: "brass" },
+      { verb: "scope", level: 3, instrument: "order" },
+      { verb: "do", level: 4, instrument: "decide" },
     ],
   };
 
@@ -176,7 +176,7 @@ describe("parseAlgorithm", () => {
         ...minimal,
         annotations: [
           ...minimal.annotations,
-          { verb: "ghost", level: 1, instrument: "strings" },
+          { verb: "ghost", level: 1, instrument: "analyze" },
         ],
       }),
     ).toThrow(/no matching step/);
@@ -188,7 +188,7 @@ describe("parseAlgorithm", () => {
         ...minimal,
         annotations: [
           ...minimal.annotations,
-          { verb: "scope", level: 5, instrument: "piano" },
+          { verb: "scope", level: 5, instrument: "integrate" },
         ],
       }),
     ).toThrow(/duplicate annotation/);

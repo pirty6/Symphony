@@ -27,31 +27,31 @@ interface LegalityRule {
 const RULES: readonly LegalityRule[] = [
   {
     level: 1,
-    instrument: "woodwinds",
+    instrument: "question",
     verdict: "illegal",
     rationale: "exploration has no surface area at the artifact level — read, do not explore",
   },
   {
     level: 1,
-    instrument: "piano",
+    instrument: "integrate",
     verdict: "illegal",
     rationale: "nothing to integrate at the artifact level — no other voices have been heard yet",
   },
   {
     level: 7,
-    instrument: "percussion",
+    instrument: "order",
     verdict: "illegal",
     rationale: "first principles do not have a sequence — ordering presupposes operations to order",
   },
   {
     level: 8,
-    instrument: "percussion",
+    instrument: "order",
     verdict: "illegal",
     rationale: "first principles do not have a sequence — ordering presupposes operations to order",
   },
   {
     level: 8,
-    instrument: "brass",
+    instrument: "decide",
     verdict: "unusual",
     rationale: "assertion at the level of pure philosophy is possible but rarely productive",
   },

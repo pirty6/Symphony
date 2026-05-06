@@ -39,18 +39,18 @@ export const LEVELS: readonly Level[] = [1, 2, 3, 4, 5, 6, 7, 8] as const;
 // kind of cognitive work performed at a beat, not the implementation.
 
 export type InstrumentType =
-  | "strings" // structural / relational
-  | "brass" // assertive / definitive
-  | "woodwinds" // exploratory / questioning
-  | "percussion" // ordering / timing
-  | "piano"; // harmonic / integrative
+  | "analyze" // structural / relational
+  | "decide" // assertive / definitive
+  | "question" // exploratory / questioning
+  | "order" // ordering / timing
+  | "integrate"; // harmonic / integrative
 
 export const INSTRUMENTS: readonly InstrumentType[] = [
-  "strings",
-  "brass",
-  "woodwinds",
-  "percussion",
-  "piano",
+  "analyze",
+  "decide",
+  "question",
+  "order",
+  "integrate",
 ] as const;
 
 // ── Domain Key ─────────────────────────────────────────────────────

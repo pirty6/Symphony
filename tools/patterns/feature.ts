@@ -15,54 +15,54 @@ const score: PatternScore = {
     {
       step: "define",
       level: 4,
-      instrument: "brass",
+      instrument: "decide",
       directive: "Define scope — inputs, outputs, and boundary. Pulled from context.scope.",
     },
     {
       step: "survey",
       level: 3,
-      instrument: "woodwinds",
+      instrument: "question",
       directive:
         "Survey neighbors — locate the modules, types, and conventions the feature will touch.",
     },
     {
       step: "specify",
       level: 4,
-      instrument: "strings",
+      instrument: "analyze",
       directive:
         "Specify contract — public signature, data shapes, error modes. Pulled from context.contract. Known edges from context.knownEdges (if any) feed the next beat.",
     },
     {
       step: "test",
       level: 4,
-      instrument: "brass",
+      instrument: "decide",
       directive:
         "Test contract and known edges — write tests for each named behavior and each known edge case. Tests must fail until implementation lands.",
     },
     {
       step: "sketch",
       level: 5,
-      instrument: "piano",
+      instrument: "integrate",
       directive:
         "Sketch design — choose the internal structure and name the components that will implement the contract.",
     },
     {
       step: "implement",
       level: 2,
-      instrument: "percussion",
+      instrument: "order",
       directive: "Implement core — write the primary code path until the contract tests pass.",
     },
     {
       step: "cover",
       level: 2,
-      instrument: "brass",
+      instrument: "decide",
       directive:
         "Cover discovered edges — handle edge cases that surfaced during implementation; add a test for each before fixing.",
     },
     {
       step: "verify",
       level: 4,
-      instrument: "piano",
+      instrument: "integrate",
       directive:
         "Verify integration — run the full suite and confirm the feature composes with existing code.",
     },

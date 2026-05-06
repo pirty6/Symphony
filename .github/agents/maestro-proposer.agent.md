@@ -76,8 +76,8 @@ The canonical algorithm for <one-line problem class>.
 - Each step is a verb + noun. No paragraphs.
 - Annotations must be deterministic — same verb + noun → same (level, instrument). If a step's annotation depends on context, the step is too vague.
 - Levels: 1=raw artifact, 2=local pattern, 3=module behavior, 4=system contract, 5=architectural, 6=domain model, 7=design philosophy, 8=first principles.
-- Instruments: strings (relational), brass (assertive), woodwinds (exploratory), percussion (ordering), piano (integrative).
-- Illegal pairs: (1,woodwinds), (1,piano), (7,percussion), (8,percussion). Avoid.
+- Instruments: analyze (relational), decide (assertive), question (exploratory), order (ordering), integrate (integrative).
+- Illegal pairs: (1,question), (1,integrate), (7,order), (8,order). Avoid.
 - The first and last steps must form a bracket: the algorithm must start with grounding (reproduce, observe, define) and end with verification (test, confirm, harden).
 
 ## Rules
