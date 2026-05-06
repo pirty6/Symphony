@@ -87,9 +87,9 @@ describe("compileScore", () => {
   });
 
   test("rejects feature with no context at all", () => {
-    expect(() =>
-      compileScore(featurePattern, { problem: "x", generatedAt: FIXED_TS }),
-    ).toThrow(/requires context\.scope/);
+    expect(() => compileScore(featurePattern, { problem: "x", generatedAt: FIXED_TS })).toThrow(
+      /requires context\.scope/,
+    );
   });
 
   test("id is deterministic across calls (excluding generatedAt)", () => {
@@ -174,10 +174,7 @@ describe("parseAlgorithm", () => {
     expect(() =>
       parseAlgorithm({
         ...minimal,
-        annotations: [
-          ...minimal.annotations,
-          { verb: "ghost", level: 1, instrument: "analyze" },
-        ],
+        annotations: [...minimal.annotations, { verb: "ghost", level: 1, instrument: "analyze" }],
       }),
     ).toThrow(/no matching step/);
   });
@@ -186,10 +183,7 @@ describe("parseAlgorithm", () => {
     expect(() =>
       parseAlgorithm({
         ...minimal,
-        annotations: [
-          ...minimal.annotations,
-          { verb: "scope", level: 5, instrument: "integrate" },
-        ],
+        annotations: [...minimal.annotations, { verb: "scope", level: 5, instrument: "integrate" }],
       }),
     ).toThrow(/duplicate annotation/);
   });
@@ -244,9 +238,9 @@ describe("compile-time legality", () => {
       description: "synthetic illegal pattern for testing",
       requiredContext: [] as readonly string[],
     };
-    expect(() =>
-      compileScore(illegalPattern, { problem: "p", generatedAt: FIXED_TS }),
-    ).toThrow(/compileScore.*illegal.*level=1.*integrate/);
+    expect(() => compileScore(illegalPattern, { problem: "p", generatedAt: FIXED_TS })).toThrow(
+      /compileScore.*illegal.*level=1.*integrate/,
+    );
   });
 
   test("error message includes the legality rationale when known", () => {

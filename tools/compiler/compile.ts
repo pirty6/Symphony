@@ -128,9 +128,7 @@ function assertBeatsLegal(beats: readonly Beat[], where: string): void {
     const offending = beat.voices.find(
       (v) => pairRationale(beat.level, v.instrument) !== undefined,
     );
-    const rationale = offending
-      ? pairRationale(beat.level, offending.instrument)
-      : undefined;
+    const rationale = offending ? pairRationale(beat.level, offending.instrument) : undefined;
     const voiceList = beat.voices.map((v) => v.instrument).join("+");
     throw new Error(
       `${where}: beat ${i} is illegal (level=${beat.level}, voices=${voiceList})` +

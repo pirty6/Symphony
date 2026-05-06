@@ -19,12 +19,7 @@
  */
 
 import { beatLegality } from "./legality";
-import {
-  INSTRUMENTS,
-  type Beat,
-  type ExecutableScore,
-  type MoveVerdict,
-} from "./types";
+import { INSTRUMENTS, type Beat, type ExecutableScore, type MoveVerdict } from "./types";
 
 // ── Voice producer enum (mirrored from perform-runner) ─────────────
 
