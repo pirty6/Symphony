@@ -182,9 +182,7 @@ function runPerform(opts: {
   }
   const result = runPerformance(score, inputs);
   if (result.kind === "failed") {
-    process.stderr.write(
-      `PERFORM ERROR (beat ${result.beatIndex}): ${result.error}\n`,
-    );
+    process.stderr.write(`PERFORM ERROR (beat ${result.beatIndex}): ${result.error}\n`);
     return 1;
   }
   writeJson(out, result.performance);
