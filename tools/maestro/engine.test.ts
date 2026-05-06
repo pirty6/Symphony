@@ -789,3 +789,90 @@ describe("full run integration", () => {
     }
   });
 });
+
+// ── planOnly + draft-pattern escalation ────────────────────────────
+
+describe("planOnly + escalation", () => {
+  test("planOnly=true + go-gate → planned terminal state with algorithm + outPath", () => {
+    let state = createEngine({
+      prompt: "rename loadScore to loadExecutableScore",
+      patterns: allPatterns,
+      pattern: "refactor",
+      planOnly: true,
+      outPath: "/tmp/plan.json",
+    } as unknown as Parameters<typeof createEngine>[0]);
+    state = advance(state, { kind: "confirm-fit", pauseId: pid(state), ok: true });
+    state = advance(state, {
+      kind: "elicit-context",
+      pauseId: pid(state),
+      values: { target: "loadScore", invariant: "imports type-check" },
+    });
+    expectPause(state, "go-gate");
+    state = advance(state, { kind: "go-gate", pauseId: pid(state), phrase: "go" });
+    // planOnly short-circuits perform-beat — we should be at `planned`.
+    expect(state.kind).toBe("planned");
+    if (state.kind === "planned") {
+      expect(state.outPath).toBe("/tmp/plan.json");
+      expect(state.algorithm.problem).toContain("rename");
+      expect(state.algorithm.steps.length).toBeGreaterThan(0);
+      expect(state.algorithm.provenance?.pattern).toBe("refactor");
+    }
+  });
+
+  test("planOnly=false (default) + go-gate → perform-beat (no planned short-circuit)", () => {
+    let state = createEngine({
+      prompt: "understand the codebase",
+      patterns: allPatterns,
+      pattern: "investigate",
+    });
+    state = advance(state, { kind: "confirm-fit", pauseId: pid(state), ok: true });
+    state = advance(state, { kind: "go-gate", pauseId: pid(state), phrase: "go" });
+    expectPause(state, "perform-beat");
+  });
+
+  test("draft-pattern complexity escalates one tier per round when baseHint < 4", () => {
+    let state = createEngine({
+      prompt: "frobnicate the widget cluster",
+      patterns: allPatterns,
+      pattern: "new",
+    });
+    state = advance(state, {
+      kind: "classify-complexity",
+      pauseId: pid(state),
+      complexity: 2,
+    });
+    const r1 = expectPause(state, "draft-pattern-round");
+    expect(r1.payload.round).toBe(1);
+    expect(r1.payload.complexity).toBe(2);
+    state = advance(state, { kind: "draft-pattern-round", pauseId: pid(state), outcome: "edit" });
+    const r2 = expectPause(state, "draft-pattern-round");
+    expect(r2.payload.round).toBe(2);
+    expect(r2.payload.complexity).toBe(3); // +1 tier
+    state = advance(state, { kind: "draft-pattern-round", pauseId: pid(state), outcome: "edit" });
+    const r3 = expectPause(state, "draft-pattern-round");
+    expect(r3.payload.round).toBe(3);
+    expect(r3.payload.complexity).toBe(4); // +1 tier
+    state = advance(state, { kind: "draft-pattern-round", pauseId: pid(state), outcome: "edit" });
+    const r4 = expectPause(state, "draft-pattern-round");
+    expect(r4.payload.round).toBe(4);
+    expect(r4.payload.complexity).toBe(4); // capped at 4
+  });
+
+  test("draft-pattern complexity baseHint=4 stays at 4 across rounds (no escalation needed)", () => {
+    let state = createEngine({
+      prompt: "frobnicate the widget cluster",
+      patterns: allPatterns,
+      pattern: "new",
+    });
+    state = advance(state, {
+      kind: "classify-complexity",
+      pauseId: pid(state),
+      complexity: 4,
+    });
+    const r1 = expectPause(state, "draft-pattern-round");
+    expect(r1.payload.complexity).toBe(4);
+    state = advance(state, { kind: "draft-pattern-round", pauseId: pid(state), outcome: "edit" });
+    const r2 = expectPause(state, "draft-pattern-round");
+    expect(r2.payload.complexity).toBe(4);
+  });
+});

@@ -24,6 +24,7 @@
  */
 
 import { fingerprintProblem, computeExecutableScoreId } from "../symphony/persistence";
+import { beatLegality, pairRationale } from "../symphony/legality";
 import {
   LEVEL_ACTIVITY_THRESHOLD,
   LEVELS,
@@ -111,6 +112,33 @@ function patternBeatsToBeats(score: PatternScore): readonly Beat[] {
   });
 }
 
+/**
+ * Reject any beat whose (level, instrument) pair is illegal per the
+ * legality matrix. Catches authoring mistakes at score-generation
+ * time instead of waiting for the load-time validator in `symphony
+ * verify`. Pure read-only check; throws with the offending beat
+ * index, level, instruments, and the rule's rationale.
+ */
+function assertBeatsLegal(beats: readonly Beat[], where: string): void {
+  for (let i = 0; i < beats.length; i += 1) {
+    const beat = beats[i];
+    if (beatLegality(beat.level, beat.voices) !== "illegal") {
+      continue;
+    }
+    const offending = beat.voices.find(
+      (v) => pairRationale(beat.level, v.instrument) !== undefined,
+    );
+    const rationale = offending
+      ? pairRationale(beat.level, offending.instrument)
+      : undefined;
+    const voiceList = beat.voices.map((v) => v.instrument).join("+");
+    throw new Error(
+      `${where}: beat ${i} is illegal (level=${beat.level}, voices=${voiceList})` +
+        (rationale ? ` \u2014 ${rationale}` : ""),
+    );
+  }
+}
+
 // ── Pattern path ───────────────────────────────────────────────────
 
 export interface CompileArgs {
@@ -146,6 +174,7 @@ export function compileScore(pattern: Pattern, args: CompileArgs): ExecutableSco
   }
 
   const beats = patternBeatsToBeats(pattern.score);
+  assertBeatsLegal(beats, `compileScore: pattern "${pattern.score.pattern}"`);
   const frequencyMap = buildFrequencyMap(beats, pattern.score.domain);
   const generatedFrom = fingerprintProblem(args.problem);
 
@@ -199,6 +228,8 @@ export function parseAlgorithm(input: AlgorithmInput): ExecutableScore {
       throw new Error(`parseAlgorithm: annotation "${verb}" has no matching step`);
     }
   }
+
+  assertBeatsLegal(beats, "parseAlgorithm");
 
   const frequencyMap = buildFrequencyMap(beats, input.domain);
   const generatedFrom = fingerprintProblem(input.problem);

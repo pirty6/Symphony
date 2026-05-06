@@ -194,3 +194,90 @@ describe("parseAlgorithm", () => {
     ).toThrow(/duplicate annotation/);
   });
 });
+
+describe("compile-time legality", () => {
+  // The legality matrix lives in tools/symphony/legality.ts. Illegal pairs
+  // include (level=1, instrument=question), (level=1, instrument=integrate),
+  // (level=7, instrument=order), (level=8, instrument=order). The compiler
+  // rejects these at generation time so authoring mistakes surface where
+  // they were made, not later at score-load time.
+
+  test("parseAlgorithm rejects an illegal (1, question) beat", () => {
+    expect(() =>
+      parseAlgorithm({
+        problem: "p",
+        domain: "test",
+        steps: [{ verb: "explore", directive: "explore raw artifact" }],
+        annotations: [{ verb: "explore", level: 1, instrument: "question" }],
+        generatedAt: FIXED_TS,
+      }),
+    ).toThrow(/parseAlgorithm.*illegal.*level=1.*question/);
+  });
+
+  test("parseAlgorithm rejects an illegal (8, order) beat", () => {
+    expect(() =>
+      parseAlgorithm({
+        problem: "p",
+        domain: "test",
+        steps: [{ verb: "sequence", directive: "sequence first principles" }],
+        annotations: [{ verb: "sequence", level: 8, instrument: "order" }],
+        generatedAt: FIXED_TS,
+      }),
+    ).toThrow(/parseAlgorithm.*illegal.*level=8.*order/);
+  });
+
+  test("compileScore rejects a synthesized pattern with an illegal beat", () => {
+    // Build a one-off pattern with a deliberately illegal (1, integrate) beat.
+    const illegalPattern = {
+      score: {
+        pattern: "illegal-test",
+        domain: "test",
+        beats: [
+          {
+            step: "merge",
+            level: 1 as const,
+            instrument: "integrate" as const,
+            directive: "merge raw artifacts",
+          },
+        ],
+      },
+      description: "synthetic illegal pattern for testing",
+      requiredContext: [] as readonly string[],
+    };
+    expect(() =>
+      compileScore(illegalPattern, { problem: "p", generatedAt: FIXED_TS }),
+    ).toThrow(/compileScore.*illegal.*level=1.*integrate/);
+  });
+
+  test("error message includes the legality rationale when known", () => {
+    expect(() =>
+      parseAlgorithm({
+        problem: "p",
+        domain: "test",
+        steps: [{ verb: "ask", directive: "ask the artifact" }],
+        annotations: [{ verb: "ask", level: 1, instrument: "question" }],
+        generatedAt: FIXED_TS,
+      }),
+    ).toThrow(/exploration has no surface area/);
+  });
+
+  test("compileScore still accepts every registered pattern (no regressions)", () => {
+    expect(() =>
+      compileScore(investigatePattern, { problem: "p", generatedAt: FIXED_TS }),
+    ).not.toThrow();
+    expect(() =>
+      compileScore(refactorPattern, {
+        problem: "p",
+        context: { target: "t", invariant: "i" },
+        generatedAt: FIXED_TS,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      compileScore(featurePattern, {
+        problem: "p",
+        context: { contract: "c", scope: "s" },
+        generatedAt: FIXED_TS,
+      }),
+    ).not.toThrow();
+  });
+});

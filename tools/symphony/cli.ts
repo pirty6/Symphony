@@ -41,13 +41,13 @@ import {
   saveRun,
 } from "./persistence";
 import { writeLibraryIndex } from "../scores/library";
-import { beatLegality } from "./legality";
+import { validateScoreShape } from "./validation";
 import { parseAlgorithm, compileScore, type AlgorithmInput } from "../compiler/compile";
 import { getPattern, listPatterns } from "../patterns";
 import { scaffoldPerformance } from "./perform";
 import { runPerformance, type PerformBeatInput } from "./perform-runner";
 import { appendLog } from "../cli-shared/log";
-import type { Beat, ExecutableScore, SavedRun } from "./types";
+import type { ExecutableScore, SavedRun } from "./types";
 
 /**
  * Wrap a runXxx that returns an exit code so every dispatch logs an
@@ -237,26 +237,6 @@ function runSaveRun(opts: {
     `OK saved:\n  pattern  = ${run.patternScore.pattern}\n  scoreId  = ${run.executableScore.id}\n  outcome  = ${run.performance.outcome}\n  file     = ${file}\n`,
   );
   return 0;
-}
-
-function validateScoreShape(score: ExecutableScore): string[] {
-  const errors: string[] = [];
-  if (score.schemaVersion !== 1) {
-    errors.push(`unsupported schemaVersion ${score.schemaVersion}`);
-  }
-  score.beats.forEach((beat: Beat, idx: number) => {
-    if (beat.voices.length === 0) {
-      errors.push(`beat ${idx}: must have at least one voice`);
-    }
-    if (beatLegality(beat.level, beat.voices) === "illegal") {
-      errors.push(
-        `beat ${idx}: illegal (level=${beat.level}, voices=${beat.voices
-          .map((v) => v.instrument)
-          .join("+")})`,
-      );
-    }
-  });
-  return errors;
 }
 
 function runVerify(opts: { readonly file: string; readonly replayAgainst?: string }): number {

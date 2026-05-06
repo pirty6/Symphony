@@ -61,9 +61,19 @@ export const MAESTRO_GO_PHRASES = ["go", "approved", "looks good", "ship it", "p
 export const MAESTRO_DRAFT_MAX_ROUNDS = 6;
 
 /**
- * Re-export of the runner's producer enum so existing maestro callers
- * don't need to know the executor moved. New code should import from
- * `../symphony/perform-runner` directly.
+ * Re-export of the runner's producer enum.
+ *
+ * API-stability boundary: when `perform-runner.ts` was split out of
+ * the engine, callers that already imported `VOICE_PRODUCERS` from
+ * `./engine` kept working without churn. The re-export is intentional
+ * — it lets `perform-runner.ts` evolve (move, rename, split further)
+ * without touching every callsite.
+ *
+ * Convention for new code:
+ *   - Maestro-internal code → import from `./engine` (this file).
+ *   - Symphony-internal code → import from `../symphony/perform-runner`.
+ *
+ * Either is correct; pick the one that matches the layer you're in.
  */
 export const VOICE_PRODUCERS: readonly VoiceProducer[] =
   RUNNER_VOICE_PRODUCERS as readonly VoiceProducer[];

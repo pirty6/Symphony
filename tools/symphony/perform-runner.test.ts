@@ -87,6 +87,66 @@ describe("validateVoiceOutputs", () => {
     }));
     expect(validateVoiceOutputs(bad, beat)).toMatch(/producedBy/);
   });
+
+  test("accepts confidence exactly 0 (boundary)", () => {
+    const score = compileInvestigate();
+    const beat = score.beats[0];
+    const ok = beat.voices.map((v) => ({
+      instrument: v.instrument,
+      output: "x",
+      confidence: 0,
+      producedBy: "maestro-assessor" as const,
+    }));
+    expect(validateVoiceOutputs(ok, beat)).toBeUndefined();
+  });
+
+  test("accepts confidence exactly 1 (boundary)", () => {
+    const score = compileInvestigate();
+    const beat = score.beats[0];
+    const ok = beat.voices.map((v) => ({
+      instrument: v.instrument,
+      output: "x",
+      confidence: 1,
+      producedBy: "maestro-assessor" as const,
+    }));
+    expect(validateVoiceOutputs(ok, beat)).toBeUndefined();
+  });
+
+  test("rejects missing producedBy field", () => {
+    const score = compileInvestigate();
+    const beat = score.beats[0];
+    const bad = beat.voices.map((v) => ({
+      instrument: v.instrument,
+      output: "x",
+      confidence: 0.5,
+      // producedBy intentionally omitted
+    })) as unknown as Parameters<typeof validateVoiceOutputs>[0];
+    expect(validateVoiceOutputs(bad, beat)).toMatch(/producedBy/);
+  });
+
+  test("rejects NaN confidence", () => {
+    const score = compileInvestigate();
+    const beat = score.beats[0];
+    const bad = beat.voices.map((v) => ({
+      instrument: v.instrument,
+      output: "x",
+      confidence: Number.NaN,
+      producedBy: "maestro-assessor" as const,
+    }));
+    expect(validateVoiceOutputs(bad, beat)).toMatch(/confidence/);
+  });
+
+  test("rejects empty-string instrument", () => {
+    const score = compileInvestigate();
+    const beat = score.beats[0];
+    const bad = beat.voices.map(() => ({
+      instrument: "",
+      output: "x",
+      confidence: 0.5,
+      producedBy: "maestro-assessor" as const,
+    }));
+    expect(validateVoiceOutputs(bad, beat)).toMatch(/non-empty string/);
+  });
 });
 
 describe("validateVerdict", () => {

@@ -1,10 +1,10 @@
 /**
- * prompts.ts — Richer prompt templates for maestro pause points.
+ * prompts.ts — Per-pause prompt strings emitted on stdout by
+ * utils.ts emitPauseAndExit. Pure builders; no engine state, no fs.
  *
- * The engine ships terse defaults inline. This module is for callers
- * (a CLI harness, an agent scaffold) that want fuller text aligned
- * with the .github/agents/maestro.agent.md voice. Pure string builders;
- * no engine state, no fs, no LLM.
+ * Token budget: keep terse. The JSON envelope already carries `kind`,
+ * `pauseId`, and `payload`; the prompt must not restate them — only
+ * direct what the agent must DO and the reply shape.
  */
 
 import type { Pattern } from "../patterns/types";
@@ -18,19 +18,15 @@ import type { Complexity } from "./types/types";
 export function composerPromptFor(pause: Pause): string {
   switch (pause.kind) {
     case "confirm-fit":
-      return confirmComposer(pause.payload.pattern, pause.payload.description);
+      return confirmComposer(pause.payload.pattern);
     case "classify-complexity":
-      return classifyComposer(pause.payload.prompt);
+      return classifyComposer();
     case "draft-pattern-round":
-      return draftComposer(pause.payload.round, pause.payload.complexity, pause.payload.priorDraft);
+      return draftComposer(pause.payload.round, pause.payload.complexity, pause.payload.priorDraft !== undefined);
     case "elicit-context":
-      return elicitComposer(
-        pause.payload.pattern,
-        pause.payload.missingKeys,
-        pause.payload.collected,
-      );
+      return elicitComposer(pause.payload.missingKeys);
     case "go-gate":
-      return goGateComposer(pause.payload.pattern, pause.payload.context, pause.payload.beats);
+      return goGateComposer();
     case "perform-beat":
       return performComposer(pause.payload.beatIndex, pause.payload.beat);
   }
@@ -39,161 +35,65 @@ export function composerPromptFor(pause: Pause): string {
 export function instrumentPromptFor(pause: Pause): string {
   switch (pause.kind) {
     case "confirm-fit":
-      return confirmInstrument(pause.payload.pattern);
+      return `Confirm pattern '${pause.payload.pattern}' or reroute.`;
     case "classify-complexity":
-      return classifyInstrument();
+      return "Reply 1|2|3|4 (lowest tier covering the risk).";
     case "draft-pattern-round":
-      return draftInstrument(pause.payload.round, pause.payload.complexity);
+      return `Round ${pause.payload.round}/${MAESTRO_DRAFT_MAX_ROUNDS}, complexity ${pause.payload.complexity}. Run debate, return draft Pattern.`;
     case "elicit-context":
-      return elicitInstrument(pause.payload.missingKeys);
+      return `Provide non-empty values for: ${pause.payload.missingKeys.join(", ")}.`;
     case "go-gate":
-      return goGateInstrument();
+      return `Send a canonical go phrase: ${MAESTRO_GO_PHRASES.join(", ")}.`;
     case "perform-beat":
-      return performInstrument(pause.payload.beatIndex, pause.payload.beat);
+      return `Beat ${pause.payload.beatIndex} (${pause.payload.beat.voices.map((v) => v.instrument).join("+")}): ${pause.payload.beat.directive}`;
   }
 }
 
 // ── Builders ───────────────────────────────────────────────────────
 
-function confirmComposer(pattern: string, description: string): string {
+function confirmComposer(pattern: string): string {
+  return `Confirm pattern '${pattern}' fits in one sentence. If not, reply ok=false with reroute=<pattern>.\nReply: { kind: 'confirm-fit', ok: boolean, reroute?: string }`;
+}
+
+function classifyComposer(): string {
   return [
-    `Pattern fit check. '${pattern}': ${description}.`,
-    "",
-    "Confirm in one sentence to the user, like:",
-    `  > This is a '${pattern}' problem. ${description}`,
-    "",
-    "If they object, reply with reroute=<other-pattern>.",
-    "Reply with: { kind: 'confirm-fit', ok: boolean, reroute?: string }",
+    "Classify prompt complexity for draft-pattern debate (lowest tier that covers the risk):",
+    "  1 trivial · 2 standard (+skeptic) · 3 high (+pragmatist) · 4 novel (+template-critic)",
+    "Reply: { kind: 'classify-complexity', complexity: 1|2|3|4 }",
   ].join("\n");
 }
 
-function confirmInstrument(pattern: string): string {
-  return `Confirm pattern '${pattern}' or reroute.`;
-}
-
-function classifyComposer(prompt: string): string {
+function draftComposer(round: number, complexity: Complexity, hasPriorDraft: boolean): string {
+  const agents = ["proposer"];
+  if (complexity >= 2) agents.push("skeptic");
+  if (complexity >= 3) agents.push("pragmatist");
+  if (complexity >= 4) agents.push("template-critic");
   return [
-    "Classify the prompt's debate complexity for the draft-pattern phase.",
-    "",
-    `Prompt: ${prompt}`,
-    "",
-    "Tiers:",
-    "  1 — trivial. Proposer only.",
-    "  2 — standard. Proposer + skeptic.",
-    "  3 — high. Proposer + skeptic + pragmatist.",
-    "  4 — novel. Proposer + skeptic + pragmatist + template-critic.",
-    "",
-    "Pick the lowest tier that still covers the risk. Don't inflate.",
-    "",
-    "Reply with: { kind: 'classify-complexity', complexity: 1 | 2 | 3 | 4 }",
+    `Draft round ${round}/${MAESTRO_DRAFT_MAX_ROUNDS}, complexity ${complexity}. Spawn: ${agents.join(", ")}.`,
+    hasPriorDraft ? "Iterate on priorDraft (in payload)." : "Propose from scratch.",
+    "Synthesize a Pattern TS module; show user code + brief notes (framing, disagreement, open risks, what was cut). Then ask: save as tools/patterns/<name>.ts or change?",
+    "Reply: { kind: 'draft-pattern-round', outcome: 'approve'|'edit'|'ambiguous', nextDraft? }",
   ].join("\n");
 }
 
-function classifyInstrument(): string {
-  return "Return one of: 1 (trivial), 2 (standard), 3 (high), 4 (novel).";
-}
-
-function draftComposer(
-  round: number,
-  complexity: Complexity,
-  priorDraft: Pattern | undefined,
-): string {
-  const agents = [
-    "proposer",
-    complexity >= 2 ? "skeptic" : undefined,
-    complexity >= 3 ? "pragmatist" : undefined,
-    complexity >= 4 ? "template-critic" : undefined,
-  ].filter(Boolean) as string[];
+function elicitComposer(missing: readonly string[]): string {
   return [
-    `Draft-pattern round ${round} of ${MAESTRO_DRAFT_MAX_ROUNDS} (complexity ${complexity}).`,
-    "",
-    `Spawn: ${agents.join(", ")}.`,
-    priorDraft
-      ? `Prior draft to iterate on:\n${JSON.stringify(priorDraft, undefined, 2)}`
-      : "No prior draft; propose from scratch.",
-    "",
-    "Synthesize a Pattern TS module. Show it to the user in plain prose:",
-    "  - 'How I got here.' (1 sentence on framing)",
-    "  - 'What we argued about.' (biggest disagreement, plain English)",
-    "  - 'What I'm not sure about.' (open risks)",
-    "  - 'What I cut.' (over-engineering trimmed)",
-    "  - Ask: save as tools/patterns/<name>.ts, or change something?",
-    "",
-    "Reply with: { kind: 'draft-pattern-round', outcome: 'approve'|'edit'|'ambiguous', nextDraft? }",
+    `Missing required context: ${missing.join(", ")}.`,
+    "For each: extract from prompt (state extraction) or ask one targeted question. Empty/whitespace rejected.",
+    "Reply: { kind: 'elicit-context', values: { <key>: <value>, ... } }",
   ].join("\n");
 }
 
-function draftInstrument(round: number, complexity: Complexity): string {
-  return `Round ${round}, complexity ${complexity}. Run the debate, return a draft Pattern.`;
-}
-
-function elicitComposer(
-  pattern: string,
-  missing: readonly string[],
-  collected: Readonly<Record<string, string>>,
-): string {
-  return [
-    `Pattern '${pattern}' requires context. Some keys are still missing.`,
-    "",
-    `Missing: [${missing.join(", ")}]`,
-    `Already collected: ${JSON.stringify(collected, undefined, 2)}`,
-    "",
-    "For each missing key:",
-    "  1. Try to extract from the user's original prompt. State the extraction explicitly.",
-    "  2. If not in the prompt, ask one targeted question.",
-    "Do not guess. Empty / whitespace values will not advance.",
-    "",
-    "Reply with: { kind: 'elicit-context', values: { <key>: <value>, ... } }",
-  ].join("\n");
-}
-
-function elicitInstrument(missing: readonly string[]): string {
-  return `Provide values for: ${missing.join(", ")}. Empty values are rejected.`;
-}
-
-function goGateComposer(
-  pattern: string,
-  context: Readonly<Record<string, string>>,
-  beats: number,
-): string {
-  return [
-    "Ready to run.",
-    "",
-    `Pattern: ${pattern}`,
-    `Beats:   ${beats}`,
-    `Context:`,
-    ...Object.entries(context).map(([k, v]) => `  ${k}: ${v}`),
-    "",
-    `Ask the user for explicit go. Accepted phrases (case-insensitive):`,
-    `  ${MAESTRO_GO_PHRASES.join(", ")}`,
-    "",
-    "Vague positive language ('sounds fine-ish', 'yeah maybe') will be rejected.",
-    "",
-    "Reply with: { kind: 'go-gate', phrase: '<user phrase>' }",
-  ].join("\n");
-}
-
-function goGateInstrument(): string {
-  return `Send a canonical go phrase: ${MAESTRO_GO_PHRASES.join(", ")}.`;
+function goGateComposer(): string {
+  return `Ask user for explicit go. Accepted (case-insensitive): ${MAESTRO_GO_PHRASES.join(", ")}. Vague positives ('yeah', 'fine-ish') rejected.\nReply: { kind: 'go-gate', phrase: '<user phrase>' }`;
 }
 
 function performComposer(beatIndex: number, beat: Beat): string {
   return [
-    `Beat ${beatIndex}: ${beat.directive}`,
-    "",
-    `Level: ${beat.level}    Voices: ${beat.voices.map((v) => v.instrument).join(", ")}`,
-    "",
-    "Read-only beats → spawn maestro-assessor.",
-    "Mutating beats → spawn maestro-executor with explicit write instructions.",
-    "Capture each voice's output, then return a verdict.",
-    "",
-    "Reply with: { kind: 'perform-beat', voiceOutputs: [...], verdict: {...} }",
-    "Voice shape: { instrument: string, output: string, confidence: number in [0,1] }.",
-    "Verdict shape: { outcome: 'applied'|'failed'|'skipped', confidence, reason, shouldTerminate }.",
-    "Wrong shape → engine fails the run before save.",
+    `Beat ${beatIndex} (L${beat.level}, ${beat.voices.map((v) => v.instrument).join("+")}): ${beat.directive}`,
+    "Read-only → spawn maestro-assessor. Mutating → spawn maestro-executor.",
+    "Reply: { kind: 'perform-beat', voiceOutputs: [...], verdict: {...} }",
+    "Voice: { instrument, output, confidence: [0,1], producedBy: 'maestro-assessor'|'maestro-executor' }.",
+    "Verdict: { outcome: 'applied'|'failed'|'skipped', confidence, reason, shouldTerminate }.",
   ].join("\n");
-}
-
-function performInstrument(beatIndex: number, beat: Beat): string {
-  return `Beat ${beatIndex} (${beat.voices.map((v) => v.instrument).join("+")}): ${beat.directive}`;
 }

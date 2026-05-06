@@ -26,28 +26,29 @@
 import * as crypto from "node:crypto";
 
 import type {
-  Beat,
   ExecutableScore,
   MoveVerdict,
   Performance,
   PerformedBeat,
   PerformedVoice,
 } from "./types";
-import { INSTRUMENTS } from "./types";
+import {
+  VOICE_PRODUCERS,
+  validateVerdict,
+  validateVoiceOutputs,
+  type VoiceOutputInput,
+  type VoiceProducer,
+} from "./validation";
 
-// ── Producer enum (single source of truth) ─────────────────────────
-
-export const VOICE_PRODUCERS = ["maestro-assessor", "maestro-executor"] as const;
-export type VoiceProducer = (typeof VOICE_PRODUCERS)[number];
+// ── Re-exports for back-compat ─────────────────────────────────────
+// Older callers (maestro/engine.ts, tests) import these names from
+// `./perform-runner`. Validators were extracted to `./validation` so
+// the compiler can run them at generation time too; perform-runner
+// keeps the names visible here.
+export { VOICE_PRODUCERS, validateVoiceOutputs, validateVerdict };
+export type { VoiceOutputInput, VoiceProducer };
 
 // ── Inputs to the runner ───────────────────────────────────────────
-
-export interface VoiceOutputInput {
-  readonly instrument: string;
-  readonly output: string;
-  readonly confidence: number;
-  readonly producedBy: VoiceProducer;
-}
 
 export interface PerformBeatInput {
   readonly voiceOutputs: readonly VoiceOutputInput[];
@@ -60,66 +61,6 @@ export type PerformanceResult =
 
 export interface RunPerformanceOptions {
   readonly clock?: () => string;
-}
-
-// ── Validators ─────────────────────────────────────────────────────
-
-export function validateVoiceOutputs(
-  outputs: readonly Partial<VoiceOutputInput>[],
-  beat: Beat,
-): string | undefined {
-  if (!Array.isArray(outputs) || outputs.length === 0) {
-    return "voiceOutputs must be a non-empty array";
-  }
-  if (outputs.length !== beat.voices.length) {
-    return `voiceOutputs length ${outputs.length} != beat.voices length ${beat.voices.length}`;
-  }
-  for (let i = 0; i < outputs.length; i += 1) {
-    const v = outputs[i];
-    if (typeof v?.instrument !== "string" || v.instrument === "") {
-      return `voiceOutputs[${i}].instrument must be a non-empty string`;
-    }
-    if (!(INSTRUMENTS as readonly string[]).includes(v.instrument)) {
-      return `voiceOutputs[${i}].instrument '${v.instrument}' is not one of: ${INSTRUMENTS.join(", ")}`;
-    }
-    if (typeof v?.output !== "string") {
-      return `voiceOutputs[${i}].output must be a string`;
-    }
-    if (
-      typeof v?.confidence !== "number" ||
-      Number.isNaN(v.confidence) ||
-      v.confidence < 0 ||
-      v.confidence > 1
-    ) {
-      return `voiceOutputs[${i}].confidence must be a number in [0,1]`;
-    }
-    if (
-      typeof v?.producedBy !== "string" ||
-      !(VOICE_PRODUCERS as readonly string[]).includes(v.producedBy)
-    ) {
-      return `voiceOutputs[${i}].producedBy must be one of: ${VOICE_PRODUCERS.join(", ")}`;
-    }
-  }
-  return undefined;
-}
-
-export function validateVerdict(v: MoveVerdict): string | undefined {
-  if (!v) {
-    return "verdict required";
-  }
-  if (!["applied", "failed", "skipped"].includes(v.outcome)) {
-    return `verdict.outcome invalid: ${String(v.outcome)}`;
-  }
-  if (typeof v.confidence !== "number" || v.confidence < 0 || v.confidence > 1) {
-    return "verdict.confidence must be a number in [0,1]";
-  }
-  if (typeof v.reason !== "string") {
-    return "verdict.reason must be a string";
-  }
-  if (typeof v.shouldTerminate !== "boolean") {
-    return "verdict.shouldTerminate must be boolean";
-  }
-  return undefined;
 }
 
 // ── Hash + outcome derivation ──────────────────────────────────────
