@@ -199,7 +199,10 @@ user to commit explicitly.
 
 The score is compiled and the engine is walking beats in order.
 `payload.beat` carries the `directive`, `level`, and `voices[*].instrument`.
-`payload.previousOutputs` carries earlier beats' outputs as context.
+`payload.previousOutputs` carries earlier beats as
+`{ beatIndex, directive, voices: [{ instrument, output }], verdictOutcome }`
+records — provenance preserved so a later beat can reason about
+which prior beat said what and whether it was applied/skipped/failed.
 
 - **Read-only beats** (investigations, analysis, design) → spawn
   `maestro-assessor`. The assessor's findings become the voice `output`.

@@ -790,4 +790,82 @@ describe("full run integration", () => {
       expect((performance as unknown as Record<string, unknown>)["performedBeats"]).toBeUndefined();
     }
   });
+
+  test("previousOutputs carries provenance: beatIndex, directive, voices, verdictOutcome", () => {
+    const investigate = getPattern("investigate");
+    if (!investigate) {
+      throw new Error("investigate pattern not found");
+    }
+
+    let state = init("audit", "investigate");
+    state = advance(state, { kind: "confirm-fit", pauseId: pid(state), ok: true });
+    state = advance(state, { kind: "go-gate", pauseId: pid(state), phrase: "go" });
+
+    // Perform beat 0.
+    const beat0 = expectPause(state, "perform-beat");
+    expect(beat0.payload.previousOutputs).toEqual([]);
+    state = advance(state, {
+      kind: "perform-beat",
+      pauseId: pid(state),
+      voiceOutputs: [
+        {
+          instrument: beat0.payload.beat.voices[0].instrument,
+          output: "first finding",
+          confidence: 0.9,
+          producedBy: "maestro-assessor",
+        },
+      ],
+      verdict: { outcome: "applied", confidence: 0.9, reason: "ok", shouldTerminate: false },
+    });
+
+    // At beat 1, previousOutputs[0] must describe beat 0 with full provenance.
+    const beat1 = expectPause(state, "perform-beat");
+    expect(beat1.payload.previousOutputs).toHaveLength(1);
+    const prior = beat1.payload.previousOutputs[0];
+    expect(prior.beatIndex).toBe(0);
+    expect(prior.directive).toBe(beat0.payload.beat.directive);
+    expect(prior.verdictOutcome).toBe("applied");
+    expect(prior.voices).toEqual([
+      { instrument: beat0.payload.beat.voices[0].instrument, output: "first finding" },
+    ]);
+  });
+
+  test("deriveOutcome returns 'partial' when every beat is skipped (no applied)", () => {
+    const investigate = getPattern("investigate");
+    if (!investigate) {
+      throw new Error("investigate pattern not found");
+    }
+    const beats = investigate.score.beats.length;
+
+    let state = init("skip everything", "investigate");
+    state = advance(state, { kind: "confirm-fit", pauseId: pid(state), ok: true });
+    state = advance(state, { kind: "go-gate", pauseId: pid(state), phrase: "go" });
+
+    for (let i = 0; i < beats; i += 1) {
+      const pause = expectPause(state, "perform-beat");
+      state = advance(state, {
+        kind: "perform-beat",
+        pauseId: pid(state),
+        voiceOutputs: [
+          {
+            instrument: pause.payload.beat.voices[0].instrument,
+            output: "n/a",
+            confidence: 0.1,
+            producedBy: "maestro-assessor",
+          },
+        ],
+        verdict: {
+          outcome: "skipped",
+          confidence: 0.1,
+          reason: "not applicable",
+          shouldTerminate: false,
+        },
+      });
+    }
+
+    expect(state.kind).toBe("done");
+    if (state.kind === "done") {
+      expect(state.result.performance.outcome).toBe("partial");
+    }
+  });
 });

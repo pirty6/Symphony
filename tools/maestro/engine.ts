@@ -524,9 +524,15 @@ function enterPerformBeat(
   if (!beat) {
     return failed(`perform-beat: out-of-range index ${beatIndex}`);
   }
-  const previousOutputs = internal.performedBeats.map((b) =>
-    b.voices.map((v) => v.output).join("\n"),
-  );
+  const previousOutputs = internal.performedBeats.map((b) => {
+    const priorBeat = internal.score?.beats[b.beatIndex];
+    return {
+      beatIndex: b.beatIndex,
+      directive: priorBeat?.directive ?? "",
+      voices: b.voices.map((v) => ({ instrument: v.instrument, output: v.output })),
+      verdictOutcome: b.verdict?.outcome ?? "skipped",
+    };
+  });
   return runningPause(internal, {
     kind: "perform-beat",
     pauseId: nid(),
@@ -680,6 +686,11 @@ function deriveOutcome(
   if (terminatedEarly) {
     const last = beats[beats.length - 1].verdict;
     return last?.outcome === "applied" ? "success" : "partial";
+  }
+  // No beat was actually applied (all skipped) — the run completed its
+  // shape but produced no work. Refuse to call that "success".
+  if (!beats.some((b) => b.verdict?.outcome === "applied")) {
+    return "partial";
   }
   return "success";
 }

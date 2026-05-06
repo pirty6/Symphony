@@ -1,5 +1,5 @@
 import type { Pattern } from "../../patterns/types";
-import type { Beat } from "../../symphony/types";
+import type { Beat, VerdictOutcome } from "../../symphony/types";
 import type {
   ClassifyComplexity,
   ConfirmFit,
@@ -22,6 +22,22 @@ interface BasePause {
 export interface PatternSummary {
   readonly pattern: string;
   readonly description: string;
+}
+
+/**
+ * Provenance-rich record of an earlier beat made available to the
+ * next perform-beat pause. Replaces the prior flat-string join so
+ * that a downstream beat sees beat index, directive, per-voice
+ * instrument labels, and the recorded verdict outcome.
+ */
+export interface PreviousBeatOutput {
+  readonly beatIndex: number;
+  readonly directive: string;
+  readonly voices: readonly {
+    readonly instrument: string;
+    readonly output: string;
+  }[];
+  readonly verdictOutcome: VerdictOutcome;
 }
 
 type ConfirmFitPattern = BasePause & {
@@ -75,7 +91,7 @@ type PerformBeatPause = BasePause & {
   readonly payload: {
     readonly beatIndex: number;
     readonly beat: Beat;
-    readonly previousOutputs: readonly string[];
+    readonly previousOutputs: readonly PreviousBeatOutput[];
   };
 };
 
