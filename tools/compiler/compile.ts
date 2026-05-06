@@ -82,19 +82,24 @@ export interface AlgorithmInput {
 
 // ── Derivation ─────────────────────────────────────────────────────
 
-function buildFrequencyMap(
-  beats: readonly Beat[],
-  domain: DomainKey,
-): FrequencyMap {
+function buildFrequencyMap(beats: readonly Beat[], domain: DomainKey): FrequencyMap {
   const counts: Record<Level, number> = {
-    1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0,
+    1: 0,
+    2: 0,
+    3: 0,
+    4: 0,
+    5: 0,
+    6: 0,
+    7: 0,
+    8: 0,
   };
-  for (const beat of beats) {counts[beat.level] += 1;}
+  for (const beat of beats) {
+    counts[beat.level] += 1;
+  }
   const total = beats.length;
 
-  const activeLevels = total === 0
-    ? []
-    : LEVELS.filter((l) => counts[l] / total >= LEVEL_ACTIVITY_THRESHOLD);
+  const activeLevels =
+    total === 0 ? [] : LEVELS.filter((l) => counts[l] / total >= LEVEL_ACTIVITY_THRESHOLD);
 
   return { key: domain, activeLevels };
 }
@@ -136,9 +141,7 @@ export function compileScore(pattern: Pattern, args: CompileArgs): ExecutableSco
       value === null ||
       (typeof value === "string" && value.trim().length === 0)
     ) {
-      throw new Error(
-        `compileScore: pattern "${pattern.score.pattern}" requires context.${key}`,
-      );
+      throw new Error(`compileScore: pattern "${pattern.score.pattern}" requires context.${key}`);
     }
   }
 
@@ -175,9 +178,7 @@ export function parseAlgorithm(input: AlgorithmInput): ExecutableScore {
   const annotationsByVerb = new Map<string, AlgorithmAnnotation>();
   for (const annotation of input.annotations) {
     if (annotationsByVerb.has(annotation.verb)) {
-      throw new Error(
-        `parseAlgorithm: duplicate annotation for verb "${annotation.verb}"`,
-      );
+      throw new Error(`parseAlgorithm: duplicate annotation for verb "${annotation.verb}"`);
     }
     annotationsByVerb.set(annotation.verb, annotation);
   }
@@ -186,9 +187,7 @@ export function parseAlgorithm(input: AlgorithmInput): ExecutableScore {
   const beats: Beat[] = input.steps.map((step) => {
     const annotation = annotationsByVerb.get(step.verb);
     if (!annotation) {
-      throw new Error(
-        `parseAlgorithm: step "${step.verb}" has no matching annotation`,
-      );
+      throw new Error(`parseAlgorithm: step "${step.verb}" has no matching annotation`);
     }
     usedVerbs.add(step.verb);
     const voices: readonly Voice[] = [{ instrument: annotation.instrument }];
@@ -197,9 +196,7 @@ export function parseAlgorithm(input: AlgorithmInput): ExecutableScore {
 
   for (const verb of annotationsByVerb.keys()) {
     if (!usedVerbs.has(verb)) {
-      throw new Error(
-        `parseAlgorithm: annotation "${verb}" has no matching step`,
-      );
+      throw new Error(`parseAlgorithm: annotation "${verb}" has no matching step`);
     }
   }
 

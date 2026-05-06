@@ -105,12 +105,7 @@ export function runStart(prompt: string, pattern: string, stateFile: string): vo
  * classify-complexity); the divergence happens at the go-gate, where
  * the engine emits an `AlgorithmInput` instead of compiling a Score.
  */
-export function runPlan(
-  prompt: string,
-  pattern: string,
-  stateFile: string,
-  outPath: string,
-): void {
+export function runPlan(prompt: string, pattern: string, stateFile: string, outPath: string): void {
   appendLog("maestro", "plan", "input", { prompt, pattern, stateFile, outPath });
   const state = createEngine({
     prompt,
