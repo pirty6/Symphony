@@ -12,9 +12,11 @@
  *
  * Subcommands:
  *
- *   maestro start   --prompt <text> --state <file>
+ *   maestro start   --prompt <text> --pattern <name|new> --state <file>
  *     Initialize a new engine. Writes opaque state to --state, prints
  *     the first Pause on stdout, exits 2.
+ *     `--pattern` is required: pass a registered pattern name (see
+ *     `symphony list-patterns`) or "new" to draft a fresh one.
  *
  *   maestro resolve --state <file> --resolution <json>
  *     Apply one Resolution. Updates --state in place. Prints next
@@ -35,11 +37,17 @@ function maestroCli(): void {
     .version(false)
     .command(
       "start",
-      "Initialize a new engine run from a prompt and write opaque state to a file",
+      "Initialize a new engine run from a prompt + chosen pattern and write opaque state to a file",
       (y) =>
         y
           .option("prompt", {
             describe: "User prompt to seed the engine with",
+            type: "string",
+            demandOption: true,
+          })
+          .option("pattern", {
+            describe:
+              "Registered pattern name (see `symphony list-patterns`) or 'new' to draft a fresh pattern",
             type: "string",
             demandOption: true,
           })
@@ -48,8 +56,8 @@ function maestroCli(): void {
             type: "string",
             demandOption: true,
           }),
-      ({ prompt, state }) => {
-        runStart(prompt, state);
+      ({ prompt, pattern, state }) => {
+        runStart(prompt, pattern, state);
       },
     )
     .command(

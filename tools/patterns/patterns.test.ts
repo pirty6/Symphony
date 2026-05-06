@@ -34,7 +34,9 @@ describe("PatternLibrary", () => {
 describe("renderPatternMarkdown", () => {
   test("emits frontmatter, heading, beats, and annotation table", () => {
     const investigate = getPattern("investigate");
-    if (!investigate) {throw new Error("investigate pattern not found");}
+    if (!investigate) {
+      throw new Error("investigate pattern not found");
+    }
     const md = renderPatternMarkdown(investigate);
     expect(md).toContain("pattern: investigate");
     expect(md).toContain("description:");
@@ -46,7 +48,9 @@ describe("renderPatternMarkdown", () => {
 
   test("renders all beats in declaration order", () => {
     const pattern = getPattern("refactor");
-    if (!pattern) {throw new Error("refactor pattern not found");}
+    if (!pattern) {
+      throw new Error("refactor pattern not found");
+    }
     const md = renderPatternMarkdown(pattern);
     let lastIndex = -1;
     for (const beat of pattern.score.beats) {
@@ -58,14 +62,18 @@ describe("renderPatternMarkdown", () => {
 
   test("notes (none) when requiredContext is empty", () => {
     const investigate = getPattern("investigate");
-    if (!investigate) {throw new Error("investigate pattern not found");}
+    if (!investigate) {
+      throw new Error("investigate pattern not found");
+    }
     const md = renderPatternMarkdown(investigate);
     expect(md).toMatch(/Required context\s*\n\s*\n\(none\)/);
   });
 
   test("lists requiredContext keys when present", () => {
     const refactor = getPattern("refactor");
-    if (!refactor) {throw new Error("refactor pattern not found");}
+    if (!refactor) {
+      throw new Error("refactor pattern not found");
+    }
     const md = renderPatternMarkdown(refactor);
     expect(md).toContain("`target`");
     expect(md).toContain("`invariant`");

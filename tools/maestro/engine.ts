@@ -8,7 +8,7 @@
  * `.github/agents/maestro.agent.md` such that every gate the
  * markdown previously asked the LLM to honor is enforced in code:
  *
- *   - agent-driven routing             (match-pattern emits every Pattern with its description)
+ *   - agent-driven routing             (pattern picked outside the engine; createEngine begins at confirm-fit or classify-complexity)
  *   - elicit-context non-empty         (re-emits while any required key blank)
  *   - go-gate canonical phrases only   (vague positive language rejected)
  *   - draft-pattern MAX_ROUNDS=6       (terminal failure on round 7)
@@ -62,8 +62,8 @@ export const VOICE_PRODUCERS: readonly VoiceProducer[] = [
 
 // ── Runs ───────────────
 
-export function runStart(prompt: string, stateFile: string): void {
-  const state = createEngine({ prompt, patterns: listPatterns() });
+export function runStart(prompt: string, pattern: string, stateFile: string): void {
+  const state = createEngine({ prompt, pattern, patterns: listPatterns() });
   if (state.kind === "failed") {
     process.stderr.write(`ENGINE ERROR: ${state.error}\n`);
     process.exit(1);
@@ -98,10 +98,22 @@ export function runResolve(stateFile: string, resolutionRaw: string): void {
 
 // ── Factory ────────────────────────────────────────────────────────
 
+/**
+ * `pattern` is required:
+ *   - a registered pattern name → first pause is `confirm-fit`
+ *   - the literal string "new"  → first pause is `classify-complexity`
+ *     (precursor to draft-pattern; for prompts where no registered pattern fits)
+ *
+ * Pattern selection happens *outside* the engine: the agent reads
+ * `symphony list-patterns --json`, picks one (or "new"), and passes it
+ * to `createEngine`. There is no routing pause; the engine begins with
+ * an active pattern (or with the explicit intent to draft one).
+ */
 export function createEngine(config: EngineConfig): EngineState {
   const clock = config.clock ?? defaultClock;
   const newPauseId = config.pauseIdFactory ?? defaultPauseIdFactory;
   const prompt = config.prompt;
+  const pattern = config.pattern;
 
   const internal: InternalState = {
     prompt,
@@ -114,29 +126,14 @@ export function createEngine(config: EngineConfig): EngineState {
     startedAt: clock(),
   };
 
-  return enterRouting(internal, newPauseId);
-}
-
-/**
- * Verb-match routing. The engine's actual first decision: does any
- * registered pattern claim this prompt?
- *
- *   1 hit  → confirm-fit on that pattern
- *   2+ hits → match-pattern to disambiguate
- *   0 hits → classify-complexity (precursor to draft-pattern)
- *
- * Complexity is only asked when we're about to draft, never on the
- * happy path.
-/**
- * The engine's first decision: which registered pattern claims this
- * prompt? The agent decides at the `match-pattern` pause from the
- * candidate list (each carrying a `description`). Routing is no
- * longer a deterministic verb match — the engine offers all known
- * patterns plus `"no-match"`, and the agent's judgment picks one.
- */
-function enterRouting(internal: InternalState, nid: () => string): EngineState {
-  const candidates = patternSummaries(internal.patterns);
-  return runningPause(internal, makeMatchPatternPause(internal.prompt, candidates, nid));
+  if (pattern === "new") {
+    return enterClassifyComplexity(internal, newPauseId);
+  }
+  const target = findPattern(internal.patterns, pattern);
+  if (!target) {
+    return failed(`createEngine: pattern '${pattern}' not registered (use "new" to draft)`);
+  }
+  return enterConfirmFit(internal, summaryOf(target), newPauseId);
 }
 
 // ── Reducer ────────────────────────────────────────────────────────
@@ -178,8 +175,6 @@ export function advance(
   }
 
   switch (pause.kind) {
-    case "match-pattern":
-      return resolveMatchPattern(internal, resolution as MatchRes, newPauseId);
     case "confirm-fit":
       return resolveConfirmFit(internal, resolution as ConfirmRes, newPauseId);
     case "classify-complexity":
@@ -197,28 +192,12 @@ export function advance(
 
 // ── Phase 1 transitions ────────────────────────────────────────────
 
-type MatchRes = Extract<Resolution, { kind: "match-pattern" }>;
 type ConfirmRes = Extract<Resolution, { kind: "confirm-fit" }>;
 type ClassifyRes = Extract<Resolution, { kind: "classify-complexity" }>;
 type DraftRes = Extract<Resolution, { kind: "draft-pattern-round" }>;
 type ElicitRes = Extract<Resolution, { kind: "elicit-context" }>;
 type GoRes = Extract<Resolution, { kind: "go-gate" }>;
 type PerformRes = Extract<Resolution, { kind: "perform-beat" }>;
-
-function resolveMatchPattern(
-  internal: InternalState,
-  res: MatchRes,
-  nid: () => string,
-): EngineState {
-  if (res.chosen === "no-match") {
-    return enterClassifyComplexity(internal, nid);
-  }
-  const target = findPattern(internal.patterns, res.chosen);
-  if (!target) {
-    return failed(`match-pattern: chosen '${res.chosen}' not registered`);
-  }
-  return enterConfirmFit(internal, summaryOf(target), nid);
-}
 
 function resolveConfirmFit(
   internal: InternalState,
@@ -237,13 +216,11 @@ function resolveConfirmFit(
     const cleared: InternalState = { ...internal, active: undefined, context: {} };
     return enterConfirmFit(cleared, summaryOf(target), nid);
   }
-  // ok=false without reroute → user said wrong pattern but doesn't yet
-  // know which one. Re-emit match-pattern with all registered patterns
-  // as candidates so they can pick (or 'no-match' to draft).
-  const cleared: InternalState = { ...internal, active: undefined, context: {} };
-  return runningPause(
-    cleared,
-    makeMatchPatternPause(internal.prompt, patternSummaries(internal.patterns), nid),
+  // ok=false without reroute → routing happens outside the engine, so the
+  // only honest response is to fail the run. The agent restarts with a
+  // new `maestro start --pattern <name|new>`.
+  return failed(
+    "confirm-fit: rejected without reroute target; restart `maestro start` with a new --pattern",
   );
 }
 
@@ -489,8 +466,8 @@ function resolveClassifyComplexity(
     );
   }
   // classify-complexity is only emitted as a precursor to draft-pattern.
-  // Verb-match routing already happened in enterRouting; the only path
-  // here is "no registered pattern claims this prompt".
+  // Routing happened outside the engine: the caller passed pattern="new"
+  // to createEngine because no registered pattern fit the prompt.
   return enterDraftPatternRound(internal, 1, res.complexity, undefined, nid);
 }
 
@@ -552,19 +529,6 @@ function finishRun(
 
 // ── Pause builders ──────────────────────────────────────────────────
 
-function makeMatchPatternPause(
-  prompt: string,
-  candidates: readonly PatternSummary[],
-  nid: () => string,
-): Pause {
-  return {
-    kind: "match-pattern",
-    pauseId: nid(),
-    payload: { prompt, candidates },
-    composerPrompt: composerForMatch(prompt, candidates),
-    instrumentPrompt: instrumentForMatch(prompt, candidates),
-  };
-}
 
 function makeElicitPause(
   pattern: Pattern,
@@ -666,10 +630,6 @@ function summaryOf(pattern: Pattern): PatternSummary {
   return { pattern: pattern.score.pattern, description: pattern.description };
 }
 
-function patternSummaries(patterns: readonly Pattern[]): readonly PatternSummary[] {
-  return patterns.map(summaryOf);
-}
-
 function pickDebateComplexity(round: number, hint: Complexity): Complexity {
   // Round 1 honors the caller's classification. Subsequent rounds may
   // escalate one tier per round, capped at 4. This keeps the doc's
@@ -700,18 +660,6 @@ function stateHashFor(scoreId: string, beatIndex: number): string {
 }
 
 // ── Prompt builders (terse defaults; richer text in prompts.ts) ────
-
-function composerForMatch(prompt: string, candidates: readonly PatternSummary[]): string {
-  return [
-    "Pick the pattern that best fits the user's prompt, or 'no-match'.",
-    `prompt: ${prompt}`,
-    "candidates:",
-    ...candidates.map((c) => `  - ${c.pattern}: ${c.description}`),
-  ].join("\n");
-}
-function instrumentForMatch(_prompt: string, candidates: readonly PatternSummary[]): string {
-  return `Pick a pattern from: ${candidates.map((c) => c.pattern).join(", ")} or 'no-match'.`;
-}
 
 function composerForConfirm(s: PatternSummary): string {
   return `Confirm pattern fit. '${s.pattern}': ${s.description}. ok?`;

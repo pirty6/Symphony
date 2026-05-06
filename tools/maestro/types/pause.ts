@@ -7,7 +7,6 @@ import type {
   ElicitContext,
   GoGate,
   KindType,
-  MatchPattern,
   PerformBeat,
 } from "./kind";
 import type { Complexity } from "./types";
@@ -24,14 +23,6 @@ export interface PatternSummary {
   readonly pattern: string;
   readonly description: string;
 }
-
-type MatchPatternPause = BasePause & {
-  readonly kind: MatchPattern;
-  readonly payload: {
-    readonly prompt: string;
-    readonly candidates: readonly PatternSummary[];
-  };
-};
 
 type ConfirmFitPattern = BasePause & {
   readonly kind: ConfirmFit;
@@ -96,7 +87,6 @@ type PerformBeatPause = BasePause & {
  * transition.
  */
 export type Pause =
-  | MatchPatternPause
   | ConfirmFitPattern
   | ClassifyComplexityPause
   | DraftPatternRoundPause

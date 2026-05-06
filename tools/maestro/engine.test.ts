@@ -5,7 +5,7 @@
  * pin every gate that, in the previous markdown-only maestro, an LLM
  * could (and did) skip:
  *
- *   - verb-match routing                          → must produce match-pattern pause
+ *   - pre-engine pattern routing                 → createEngine lands at confirm-fit or classify-complexity
  *   - confirm-fit reroute                         → re-enters phase 1 cleanly
  *   - elicit-context refuses empty values         → footnote-class control-flow gate
  *   - go-gate refuses vague positive language     → only canonical phrases advance
@@ -69,74 +69,62 @@ function classifyAt(
 }
 
 /**
- * Bootstraps an engine with the canonical pattern set and resolves the
- * unconditional `match-pattern` pause by picking the supplied pattern
- * (default: 'refactor'). Returns the post-match state — typically
- * `confirm-fit`, or `classify-complexity` when chosen='no-match'.
+ * Bootstraps an engine with the canonical pattern set and the supplied
+ * pattern choice (default: 'refactor'). Returns the first pause —
+ * `confirm-fit` for a registered pattern name, `classify-complexity`
+ * when chosen='new'.
  */
-function init(
-  prompt: string,
-  chosen: string = "refactor",
-): ReturnType<typeof createEngine> {
-  const s0 = createEngine({ prompt, patterns: allPatterns });
-  if (s0.kind !== "running" || s0.pause.kind !== "match-pattern") {
-    throw new Error(
-      `init: expected match-pattern as first pause, got ${s0.kind === "running" ? s0.pause.kind : s0.kind}`,
-    );
-  }
-  return advance(s0, { kind: "match-pattern", pauseId: s0.pause.pauseId, chosen });
+function init(prompt: string, chosen: string = "refactor"): ReturnType<typeof createEngine> {
+  return createEngine({ prompt, pattern: chosen, patterns: allPatterns });
 }
 
 /**
- * Helper: bootstrap and reach `draft-pattern-round` round 1 by
- * picking 'no-match' at the routing pause then classifying with the
- * supplied complexity.
+ * Helper: bootstrap with chosen='new' and reach `draft-pattern-round`
+ * round 1 by classifying with the supplied complexity.
  */
 function draftFrom(prompt: string, complexity: Complexity): ReturnType<typeof createEngine> {
-  const s0 = createEngine({ prompt, patterns: allPatterns });
-  const s1 = advance(s0, { kind: "match-pattern", pauseId: pid(s0), chosen: "no-match" });
-  return classifyAt(s1, complexity);
+  const s0 = createEngine({ prompt, pattern: "new", patterns: allPatterns });
+  return classifyAt(s0, complexity);
 }
 
-// ── Phase 1: match-pattern ─────────────────────────────────────────
+// ── Phase 1: pattern routing happens at createEngine ───────────────
 
-describe("match-pattern routing", () => {
-  test("createEngine emits match-pattern with every registered pattern as candidate", () => {
+describe("createEngine pattern routing", () => {
+  test("a registered pattern name lands at confirm-fit immediately", () => {
     const s0 = createEngine({
       prompt: "rename loadScore to loadExecutableScore",
+      pattern: "refactor",
       patterns: allPatterns,
     });
-    const pause = expectPause(s0, "match-pattern");
-    const names = pause.payload.candidates.map((c) => c.pattern).sort();
-    expect(names).toEqual(["feature", "investigate", "refactor"]);
-    for (const c of pause.payload.candidates) {
-      expect(typeof c.description).toBe("string");
-      expect(c.description.length).toBeGreaterThan(0);
-    }
-  });
-
-  test("picking a registered pattern advances to confirm-fit", () => {
-    const s0 = init("rename loadScore to loadExecutableScore", "refactor");
     const pause = expectPause(s0, "confirm-fit");
     expect(pause.payload.pattern).toBe("refactor");
+    expect(typeof pause.payload.description).toBe("string");
+    expect(pause.payload.description.length).toBeGreaterThan(0);
   });
 
-  test("picking 'no-match' advances to classify-complexity, then draft-pattern-round 1", () => {
+  test("pattern='new' lands at classify-complexity, then draft-pattern-round 1", () => {
     const s0 = createEngine({
       prompt: "frobnicate the widget cluster",
+      pattern: "new",
       patterns: allPatterns,
     });
-    expectPause(s0, "match-pattern");
-    const s1 = advance(s0, {
-      kind: "match-pattern",
-      pauseId: pid(s0),
-      chosen: "no-match",
-    });
-    expectPause(s1, "classify-complexity");
-    const s2 = classifyAt(s1, 2);
-    const pause = expectPause(s2, "draft-pattern-round");
+    expectPause(s0, "classify-complexity");
+    const s1 = classifyAt(s0, 2);
+    const pause = expectPause(s1, "draft-pattern-round");
     expect(pause.payload.round).toBe(1);
     expect(pause.payload.priorDraft).toBeUndefined();
+  });
+
+  test("an unknown pattern name fails the engine", () => {
+    const s = createEngine({
+      prompt: "do something",
+      pattern: "nonexistent",
+      patterns: allPatterns,
+    });
+    expect(s.kind).toBe("failed");
+    if (s.kind === "failed") {
+      expect(s.error).toMatch(/not registered/);
+    }
   });
 });
 
@@ -165,14 +153,16 @@ describe("confirm-fit", () => {
     expect(pause.payload.pattern).toBe("investigate");
   });
 
-  test("ok=false without reroute re-emits match-pattern listing all patterns", () => {
+  test("ok=false without reroute fails the engine (agent must restart with new --pattern)", () => {
     const s0 = init("rename loadScore to loadExecutableScore");
     const s1 = advance(s0, { kind: "confirm-fit", pauseId: pid(s0), ok: false });
-    // User said wrong pattern but doesn't yet know which. Engine offers
-    // every registered pattern as a candidate (or 'no-match' to draft).
-    const pause = expectPause(s1, "match-pattern");
-    const names = pause.payload.candidates.map((c) => c.pattern).sort();
-    expect(names).toEqual(["feature", "investigate", "refactor"]);
+    // Routing is a pre-engine concern. Bare rejection is unrecoverable
+    // inside this engine run — the agent reads the failure and starts a
+    // new `maestro start` with a different --pattern.
+    expect(s1.kind).toBe("failed");
+    if (s1.kind === "failed") {
+      expect(s1.error).toMatch(/rejected without reroute/);
+    }
   });
 
   test("reroute to unknown pattern fails the engine", () => {
@@ -512,27 +502,33 @@ describe("debate complexity classification", () => {
     expect(seen).toEqual([1, 2, 3, 4, 4, 4]);
   });
 
-  test("classify-complexity is emitted only after picking 'no-match'", () => {
-    // Every prompt now lands at match-pattern first.
-    const s0 = createEngine({
+  test("classify-complexity is emitted when createEngine is called with pattern='new'", () => {
+    // A registered-pattern start lands at confirm-fit; classify-complexity
+    // never appears on the happy path.
+    const matched = createEngine({
       prompt: "rename loadScore to loadExecutableScore",
+      pattern: "refactor",
       patterns: allPatterns,
     });
-    expectPause(s0, "match-pattern");
-    // Picking 'no-match' is what triggers classify-complexity.
-    const s1 = advance(s0, { kind: "match-pattern", pauseId: pid(s0), chosen: "no-match" });
-    expectPause(s1, "classify-complexity");
+    expectPause(matched, "confirm-fit");
+    // pattern='new' is what triggers classify-complexity.
+    const drafted = createEngine({
+      prompt: "frobnicate the widget cluster",
+      pattern: "new",
+      patterns: allPatterns,
+    });
+    expectPause(drafted, "classify-complexity");
   });
 
   test("classify-complexity rejects out-of-range values", () => {
     const s0 = createEngine({
       prompt: "frobnicate the widget cluster",
+      pattern: "new",
       patterns: allPatterns,
     });
-    const sMatch = advance(s0, { kind: "match-pattern", pauseId: pid(s0), chosen: "no-match" });
-    const s1 = advance(sMatch, {
+    const s1 = advance(s0, {
       kind: "classify-complexity",
-      pauseId: pid(sMatch),
+      pauseId: pid(s0),
       complexity: 7 as 1 | 2 | 3 | 4,
     });
     expect(s1.kind).toBe("failed");
@@ -607,23 +603,24 @@ describe("pauseId idempotency", () => {
       counter += 1;
       return `pid-${counter}`;
     };
-    // First pause is always match-pattern (pid-1).
+    // First pause is confirm-fit (pid-1) since pattern was chosen at construction.
     const s0 = createEngine({
       prompt: "rename loadScore to loadExecutableScore",
+      pattern: "refactor",
       patterns: allPatterns,
       pauseIdFactory: factory,
     });
     expect(pid(s0)).toBe("pid-1");
     const s1 = advance(
       s0,
-      { kind: "match-pattern", pauseId: "pid-1", chosen: "refactor" },
+      { kind: "confirm-fit", pauseId: "pid-1", ok: true },
       { pauseIdFactory: factory },
     );
-    // Picking refactor → confirm-fit (pid-2).
+    // confirm-fit ok → elicit-context (pid-2).
     expect(pid(s1)).toBe("pid-2");
     const s2 = advance(
       s1,
-      { kind: "confirm-fit", pauseId: "pid-2", ok: true },
+      { kind: "elicit-context", pauseId: "pid-2", values: { target: "x", invariant: "y" } },
       { pauseIdFactory: factory },
     );
     expect(pid(s2)).toBe("pid-3");

@@ -16,8 +16,7 @@ const score: PatternScore = {
       step: "define",
       level: 4,
       instrument: "brass",
-      directive:
-        "Define scope — inputs, outputs, and boundary. Pulled from context.scope.",
+      directive: "Define scope — inputs, outputs, and boundary. Pulled from context.scope.",
     },
     {
       step: "survey",
@@ -51,8 +50,7 @@ const score: PatternScore = {
       step: "implement",
       level: 2,
       instrument: "percussion",
-      directive:
-        "Implement core — write the primary code path until the contract tests pass.",
+      directive: "Implement core — write the primary code path until the contract tests pass.",
     },
     {
       step: "cover",

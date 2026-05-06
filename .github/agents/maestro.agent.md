@@ -29,13 +29,24 @@ output should say.
 
 ## How to drive the engine
 
-```bash
-# Start a run. Writes opaque state to <state-file>; exits 2 with a Pause.
-npx tsx tools/maestro/cli.ts start \
-  --prompt "<user's original prompt>" \
-  --state  /tmp/<slug>.state.json
+Routing ("which pattern fits this prompt?") happens **outside** the
+engine. Before `start`, list the registered patterns and pick one (or
+the literal string `"new"` to draft a fresh pattern):
 
-# Apply one Resolution. Exit 2 = next Pause; exit 0 = done; exit 1 = failed.
+```bash
+# 1. List patterns. Each entry has { pattern, domain, description, requiredContext, beats }.
+npx tsx tools/symphony/cli.ts list-patterns --json
+
+# 2. Read the descriptions, weigh them against the user's prompt, pick one.
+#    Use "new" if no registered pattern fits and you want to draft a new one.
+
+# 3. Start a run with the chosen pattern. Writes opaque state; exits 2 with a Pause.
+npx tsx tools/maestro/cli.ts start \
+  --prompt  "<user's original prompt>" \
+  --pattern "<chosen-name|new>" \
+  --state   /tmp/<slug>.state.json
+
+# 4. Apply one Resolution. Exit 2 = next Pause; exit 0 = done; exit 1 = failed.
 npx tsx tools/maestro/cli.ts resolve \
   --state      /tmp/<slug>.state.json \
   --resolution '<json>'
@@ -88,45 +99,37 @@ you're about to send.
 
 ---
 
-## The seven Pause kinds
-
-### `match-pattern`
-
-Always the **first** pause emitted by `createEngine`. The engine
-offers every registered pattern as a candidate and asks you to pick
-the one that fits the user's prompt. Each candidate carries a
-`description: string` field summarizing the pattern's intent — read
-the descriptions, weigh them against the prompt, and pick the closest
-match, or `"no-match"` to enter the draft-pattern path.
-
-`payload.candidates: ReadonlyArray<{ pattern: string; description: string }>`
-
-> Resolution: `{ "kind": "match-pattern", "pauseId": "<echo>", "chosen": "<pattern>" | "no-match" }`
+## The six Pause kinds
 
 ### `confirm-fit`
 
-After you pick a pattern at `match-pattern`, the engine surfaces it
-back for a final fit check before any context is collected. State the
-pattern in one sentence so the user can object:
+The **first** pause emitted by `createEngine` when you start with a
+registered pattern. The engine surfaces the chosen pattern and its
+description back to you for a final fit check before any context is
+collected. State the pattern in one sentence so the user can object:
 
 > _"This is a `refactor` problem. I'll use the `refactor` pattern."_
+
+`payload: { pattern: string; description: string }`
 
 If the user objects with a different pattern name, send `ok=false`
 with `reroute=<name>` — the engine emits a fresh `confirm-fit` on that
 pattern (it does not silently skip; you re-confirm with the user).
-If the user objects but doesn't name a target, send `ok=false` alone —
-the engine re-emits `match-pattern` with every registered pattern.
+If the user objects but doesn't name a target, the only honest path is
+to fail this run and start over: send `ok=false` alone, the engine
+fails with `confirm-fit: rejected without reroute target`, and you
+invoke `maestro start` again with a different `--pattern`.
 
 > Resolution: `{ "kind": "confirm-fit", "pauseId": "<echo>", "ok": true }`
 > or `{ "kind": "confirm-fit", "pauseId": "<echo>", "ok": false, "reroute": "<pattern>" }`
 
 ### `classify-complexity`
 
-Reached only after you choose `"no-match"` at `match-pattern` (or
-reject every reroute at `confirm-fit`). Before drafting a new pattern,
-the engine asks how much debate the design needs. This pause is _only_
-emitted as a precursor to draft-pattern — patterns are pre-debated
-artifacts, so picking a registered pattern never triggers it.
+The **first** pause emitted when you start with `--pattern new`. Before
+drafting a new pattern, the engine asks how much debate the design
+needs. This pause is _only_ emitted as a precursor to draft-pattern —
+registered patterns are pre-debated artifacts, so they never trigger
+it.
 
 Pick the lowest tier that still covers the risk:
 
@@ -258,9 +261,9 @@ npx tsx tools/symphony/cli.ts verify --file <returned-path>
 
 These cannot be violated, even by accident:
 
-- **Routing requires an explicit pick** — every run starts at
-  `match-pattern`. You cannot drive a pattern without choosing it (the
-  engine validates the choice against the registry).
+- **Routing requires an explicit pre-engine pick** — you must pass
+  `--pattern <name|new>` to `maestro start`. The engine validates the
+  name against the registry and refuses to run on an unknown pattern.
 - **`requiredContext` is complete and non-empty** before compile.
 - **Only canonical go phrases** advance past `go-gate`.
 - **`MAX_ROUNDS = 6`** in draft-pattern; round 7 fails the run.

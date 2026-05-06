@@ -10,15 +10,13 @@
 import type { Pattern } from "../patterns/types";
 import type { Beat } from "../symphony/types";
 import { MAESTRO_DRAFT_MAX_ROUNDS, MAESTRO_GO_PHRASES } from "./engine";
-import type { Pause, PatternSummary } from "./types/pause";
+import type { Pause } from "./types/pause";
 import type { Complexity } from "./types/types";
 
 // ── Per-pause builders ─────────────────────────────────────────────
 
 export function composerPromptFor(pause: Pause): string {
   switch (pause.kind) {
-    case "match-pattern":
-      return matchComposer(pause.payload.prompt, pause.payload.candidates);
     case "confirm-fit":
       return confirmComposer(pause.payload.pattern, pause.payload.description);
     case "classify-complexity":
@@ -40,8 +38,6 @@ export function composerPromptFor(pause: Pause): string {
 
 export function instrumentPromptFor(pause: Pause): string {
   switch (pause.kind) {
-    case "match-pattern":
-      return matchInstrument(pause.payload.candidates);
     case "confirm-fit":
       return confirmInstrument(pause.payload.pattern);
     case "classify-complexity":
@@ -59,22 +55,6 @@ export function instrumentPromptFor(pause: Pause): string {
 
 // ── Builders ───────────────────────────────────────────────────────
 
-function matchComposer(prompt: string, candidates: readonly PatternSummary[]): string {
-  return [
-    "Pick the pattern that best fits the user's prompt.",
-    "",
-    `Prompt: ${prompt}`,
-    "",
-    "Candidates:",
-    ...candidates.map((c) => `  - ${c.pattern}: ${c.description}`),
-    "",
-    "Reply with: { kind: 'match-pattern', chosen: '<name>' | 'no-match' }",
-  ].join("\n");
-}
-
-function matchInstrument(candidates: readonly PatternSummary[]): string {
-  return `Pick one of: ${candidates.map((c) => c.pattern).join(", ")} or 'no-match'.`;
-}
 
 function confirmComposer(pattern: string, description: string): string {
   return [

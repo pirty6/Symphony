@@ -21,6 +21,8 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import yargs from "yargs";
+import { hideBin } from "yargs/helpers";
 
 import {
   detectDivergence,
@@ -38,78 +40,6 @@ import { renderPatternMarkdown } from "../patterns/render";
 import { scaffoldPerformance } from "./perform";
 import type { Beat, ExecutableScore, SavedRun } from "./types";
 
-interface CliArgs {
-  readonly command: string;
-  readonly subcommand?: string;
-  readonly score?: string;
-  readonly performance?: string;
-  readonly file?: string;
-  readonly replayAgainst?: string;
-  readonly input?: string;
-  readonly out?: string;
-  readonly pattern?: string;
-  readonly json?: boolean;
-}
-
-function parseArgs(argv: readonly string[]): CliArgs {
-  const args = argv.slice(2);
-  const command = args[0] ?? "";
-  let nextIdx = 1;
-  let subcommand: string | undefined;
-  if (args[1] && !args[1].startsWith("--")) {
-    subcommand = args[1];
-    nextIdx = 2;
-  }
-  const out: Record<string, string> = {};
-  const flags = new Set<string>();
-  for (let i = nextIdx; i < args.length; i += 1) {
-    const arg = args[i];
-    if (!arg.startsWith("--")) {
-      continue;
-    }
-    const eq = arg.indexOf("=");
-    if (eq !== -1) {
-      out[arg.substring(2, eq)] = arg.substring(eq + 1);
-    } else if (i + 1 < args.length && !args[i + 1].startsWith("--")) {
-      i += 1;
-      out[arg.substring(2)] = args[i];
-    } else {
-      flags.add(arg.substring(2));
-    }
-  }
-  return {
-    command,
-    subcommand,
-    score: out["score"],
-    performance: out["performance"],
-    file: out["file"],
-    replayAgainst: out["replay-against"],
-    input: out["input"],
-    out: out["out"],
-    pattern: out["pattern"],
-    json: flags.has("json"),
-  };
-}
-
-function usage() {
-  process.stderr.write(
-    [
-      "Usage:",
-      "  symphony list-patterns        [--json]",
-      "  symphony pattern view         --pattern <name> [--out <file.md>]",
-      "  symphony from-pattern         --pattern <name> --input <input.json> --out <score.json>",
-      "                                input.json: { problem: string, context?: object }",
-      "  symphony parse                --input <algorithm.json> --out <score.json>",
-      "  symphony scaffold-performance --score <score.json> --out <performance.json>",
-      "  symphony save-run             --pattern <name> --score <s.json> --performance <p.json>",
-      "  symphony verify               --file <savedrun.json> [--replay-against <fresh-performance.json>]",
-      "  symphony library-index",
-      "",
-    ].join("\n"),
-  );
-  process.exit(1);
-}
-
 function readJson<T>(file: string): T {
   return JSON.parse(fs.readFileSync(file, "utf8")) as T;
 }
@@ -119,11 +49,12 @@ function writeJson(file: string, value: unknown): void {
   fs.writeFileSync(file, JSON.stringify(value, undefined, 2) + "\n", "utf8");
 }
 
-function runFromPattern(args: CliArgs): number {
-  const { pattern: patternName, input, out } = args;
-  if (!patternName || !input || !out) {
-    usage();
-  }
+function runFromPattern(opts: {
+  readonly pattern: string;
+  readonly input: string;
+  readonly out: string;
+}): number {
+  const { pattern: patternName, input, out } = opts;
   const pattern = getPattern(patternName);
   if (!pattern) {
     process.stderr.write(
@@ -163,11 +94,8 @@ function runFromPattern(args: CliArgs): number {
   return 0;
 }
 
-function runParse(args: CliArgs): number {
-  const { input, out } = args;
-  if (!input || !out) {
-    usage();
-  }
+function runParse(opts: { readonly input: string; readonly out: string }): number {
+  const { input, out } = opts;
   let parsed: AlgorithmInput;
   try {
     parsed = readJson(input);
@@ -189,11 +117,8 @@ function runParse(args: CliArgs): number {
   return 0;
 }
 
-function runScaffold(args: CliArgs): number {
-  const { score: scoreFile, out } = args;
-  if (!scoreFile || !out) {
-    usage();
-  }
+function runScaffold(opts: { readonly score: string; readonly out: string }): number {
+  const { score: scoreFile, out } = opts;
   let score: ExecutableScore;
   try {
     score = loadExecutableScore(scoreFile);
@@ -209,11 +134,12 @@ function runScaffold(args: CliArgs): number {
   return 0;
 }
 
-function runSaveRun(args: CliArgs): number {
-  const { pattern: patternName, score: scoreFile, performance: performanceFile } = args;
-  if (!patternName || !scoreFile || !performanceFile) {
-    usage();
-  }
+function runSaveRun(opts: {
+  readonly pattern: string;
+  readonly score: string;
+  readonly performance: string;
+}): number {
+  const { pattern: patternName, score: scoreFile, performance: performanceFile } = opts;
   const pattern = getPattern(patternName);
   if (!pattern) {
     process.stderr.write(`UNKNOWN PATTERN: ${patternName}\n`);
@@ -275,11 +201,8 @@ function validateScoreShape(score: ExecutableScore): string[] {
   return errors;
 }
 
-function runVerify(args: CliArgs): number {
-  const { file } = args;
-  if (!file) {
-    usage();
-  }
+function runVerify(opts: { readonly file: string; readonly replayAgainst?: string }): number {
+  const { file } = opts;
   let run: SavedRun;
   try {
     run = loadRun(file);
@@ -302,10 +225,10 @@ function runVerify(args: CliArgs): number {
       `  beats        = ${run.executableScore.beats.length}\n` +
       `  performance  = ${run.performance.outcome} (${run.performance.beats.length} beats)\n`,
   );
-  if (args.replayAgainst) {
+  if (opts.replayAgainst) {
     let fresh;
     try {
-      fresh = loadPerformance(args.replayAgainst);
+      fresh = loadPerformance(opts.replayAgainst);
     } catch (err) {
       process.stderr.write(`REPLAY LOAD ERROR: ${(err as Error).message}\n`);
       return 1;
@@ -332,9 +255,9 @@ function runLibraryIndex(): number {
   return 0;
 }
 
-function runListPatterns(args: CliArgs): number {
+function runListPatterns(opts: { readonly json: boolean }): number {
   const patterns = listPatterns();
-  if (args.json) {
+  if (opts.json) {
     const out = patterns.map((p) => ({
       pattern: p.score.pattern,
       domain: p.score.domain,
@@ -356,24 +279,18 @@ function runListPatterns(args: CliArgs): number {
   return 0;
 }
 
-function runPatternView(args: CliArgs): number {
-  if (args.subcommand !== "view") {
-    usage();
-  }
-  if (!args.pattern) {
-    usage();
-  }
-  const pattern = getPattern(args.pattern);
+function runPatternView(opts: { readonly pattern: string; readonly out?: string }): number {
+  const pattern = getPattern(opts.pattern);
   if (!pattern) {
-    process.stderr.write(`UNKNOWN PATTERN: ${args.pattern}\n`);
+    process.stderr.write(`UNKNOWN PATTERN: ${opts.pattern}\n`);
     return 1;
   }
   const md = renderPatternMarkdown(pattern);
-  if (args.out) {
-    fs.mkdirSync(path.dirname(args.out), { recursive: true });
-    fs.writeFileSync(args.out, md, "utf8");
+  if (opts.out) {
+    fs.mkdirSync(path.dirname(opts.out), { recursive: true });
+    fs.writeFileSync(opts.out, md, "utf8");
     process.stdout.write(
-      `OK rendered:\n  pattern = ${pattern.score.pattern}\n  out     = ${args.out}\n`,
+      `OK rendered:\n  pattern = ${pattern.score.pattern}\n  out     = ${opts.out}\n`,
     );
   } else {
     process.stdout.write(md);
@@ -382,35 +299,140 @@ function runPatternView(args: CliArgs): number {
 }
 
 function main(): void {
-  const args = parseArgs(process.argv);
-  switch (args.command) {
-    case "list-patterns":
-      process.exit(runListPatterns(args));
-    // eslint-disable-next-line no-fallthrough
-    case "pattern":
-      process.exit(runPatternView(args));
-    // eslint-disable-next-line no-fallthrough
-    case "from-pattern":
-      process.exit(runFromPattern(args));
-    // eslint-disable-next-line no-fallthrough
-    case "parse":
-      process.exit(runParse(args));
-    // eslint-disable-next-line no-fallthrough
-    case "scaffold-performance":
-      process.exit(runScaffold(args));
-    // eslint-disable-next-line no-fallthrough
-    case "save-run":
-      process.exit(runSaveRun(args));
-    // eslint-disable-next-line no-fallthrough
-    case "verify":
-      process.exit(runVerify(args));
-    // eslint-disable-next-line no-fallthrough
-    case "library-index":
-      process.exit(runLibraryIndex());
-    // eslint-disable-next-line no-fallthrough
-    default:
-      usage();
-  }
+  yargs(hideBin(process.argv))
+    .scriptName("symphony")
+    .strict()
+    .version(false)
+    .command(
+      "list-patterns",
+      "List registered patterns (with descriptions and required context)",
+      (y) =>
+        y.option("json", {
+          describe: "Emit machine-readable JSON instead of the human summary",
+          type: "boolean",
+          default: false,
+        }),
+      (a) => process.exit(runListPatterns({ json: a.json })),
+    )
+    .command(
+      "pattern <subcommand>",
+      "Pattern operations",
+      (y) =>
+        y
+          .positional("subcommand", {
+            describe: "Pattern operation",
+            choices: ["view"] as const,
+            demandOption: true,
+          })
+          .option("pattern", {
+            describe: "Pattern name",
+            type: "string",
+            demandOption: true,
+          })
+          .option("out", {
+            describe: "Optional file path; otherwise prints to stdout",
+            type: "string",
+          }),
+      (a) => process.exit(runPatternView({ pattern: a.pattern, out: a.out })),
+    )
+    .command(
+      "from-pattern",
+      "Compile a registered Pattern + input.json into an ExecutableScore",
+      (y) =>
+        y
+          .option("pattern", { describe: "Pattern name", type: "string", demandOption: true })
+          .option("input", {
+            describe: "Input JSON: { problem: string, context?: object }",
+            type: "string",
+            demandOption: true,
+          })
+          .option("out", {
+            describe: "Output ExecutableScore JSON path",
+            type: "string",
+            demandOption: true,
+          }),
+      (a) => process.exit(runFromPattern({ pattern: a.pattern, input: a.input, out: a.out })),
+    )
+    .command(
+      "parse",
+      "Parse an algorithm.json into an ExecutableScore",
+      (y) =>
+        y
+          .option("input", {
+            describe: "Input algorithm JSON",
+            type: "string",
+            demandOption: true,
+          })
+          .option("out", {
+            describe: "Output ExecutableScore JSON path",
+            type: "string",
+            demandOption: true,
+          }),
+      (a) => process.exit(runParse({ input: a.input, out: a.out })),
+    )
+    .command(
+      "scaffold-performance",
+      "Scaffold an empty Performance from an ExecutableScore",
+      (y) =>
+        y
+          .option("score", {
+            describe: "ExecutableScore JSON path",
+            type: "string",
+            demandOption: true,
+          })
+          .option("out", {
+            describe: "Output Performance JSON path",
+            type: "string",
+            demandOption: true,
+          }),
+      (a) => process.exit(runScaffold({ score: a.score, out: a.out })),
+    )
+    .command(
+      "save-run",
+      "Persist a SavedRun (pattern + score + performance) to the canonical store",
+      (y) =>
+        y
+          .option("pattern", { describe: "Pattern name", type: "string", demandOption: true })
+          .option("score", {
+            describe: "ExecutableScore JSON path",
+            type: "string",
+            demandOption: true,
+          })
+          .option("performance", {
+            describe: "Performance JSON path",
+            type: "string",
+            demandOption: true,
+          }),
+      (a) =>
+        process.exit(
+          runSaveRun({ pattern: a.pattern, score: a.score, performance: a.performance }),
+        ),
+    )
+    .command(
+      "verify",
+      "Verify a SavedRun; optionally compare against a fresh Performance",
+      (y) =>
+        y
+          .option("file", {
+            describe: "SavedRun JSON path",
+            type: "string",
+            demandOption: true,
+          })
+          .option("replay-against", {
+            describe: "Optional fresh Performance JSON to diff against",
+            type: "string",
+          }),
+      (a) => process.exit(runVerify({ file: a.file, replayAgainst: a["replay-against"] })),
+    )
+    .command(
+      "library-index",
+      "Rebuild tools/scores/index.json from saved runs",
+      (y) => y,
+      () => process.exit(runLibraryIndex()),
+    )
+    .demandCommand(1, "Specify a subcommand.")
+    .help()
+    .parse();
 }
 
 main();

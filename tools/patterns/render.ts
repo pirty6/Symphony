@@ -41,9 +41,7 @@ export function renderPatternMarkdown(pattern: Pattern): string {
   lines.push("## Beats");
   lines.push("");
   ps.beats.forEach((b, i) => {
-    lines.push(
-      `${i + 1}. **${b.step}** \`(level ${b.level}, ${b.instrument})\` — ${b.directive}`,
-    );
+    lines.push(`${i + 1}. **${b.step}** \`(level ${b.level}, ${b.instrument})\` — ${b.directive}`);
   });
   lines.push("");
   lines.push("## Annotation table");

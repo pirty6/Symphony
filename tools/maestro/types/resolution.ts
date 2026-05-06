@@ -7,7 +7,6 @@ import type {
   ElicitContext,
   GoGate,
   KindType,
-  MatchPattern,
   PerformBeat,
 } from "./kind";
 import type { Complexity, VoiceProducer } from "./types";
@@ -16,11 +15,6 @@ interface ResolutionBase {
   readonly kind: KindType;
   readonly pauseId: string;
 }
-
-type MatchPatternResolution = ResolutionBase & {
-  readonly kind: MatchPattern;
-  readonly chosen: string | "no-match";
-};
 
 type ElicitContextResolution = ResolutionBase & {
   readonly kind: ElicitContext;
@@ -67,7 +61,6 @@ type PerformBeatResolution = ResolutionBase & {
  * same Resolution after the state has already advanced.
  */
 export type Resolution =
-  | MatchPatternResolution
   | ConfirmFitResolution
   | ElicitContextResolution
   | ClassifyComplexityResolution

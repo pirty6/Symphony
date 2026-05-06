@@ -20,11 +20,7 @@
  * directives keep the skeleton truly reusable.
  */
 
-import type {
-  DomainKey,
-  InstrumentType,
-  Level,
-} from "../symphony/types";
+import type { DomainKey, InstrumentType, Level } from "../symphony/types";
 
 /**
  * One beat of a Pattern's static skeleton.
@@ -78,7 +74,7 @@ export interface PatternScore {
  */
 export interface Pattern {
   readonly score: PatternScore;
-  /** One-line summary shown at the match-pattern pause. */
+  /** One-line summary read by the agent at pattern-selection time (`symphony list-patterns`). */
   readonly description: string;
   /** Keys that must be present in the ExecutableScore's `context` field. */
   readonly requiredContext: readonly string[];

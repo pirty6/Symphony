@@ -5,6 +5,14 @@ import type { Pause } from "./pause";
 export interface EngineConfig {
   readonly prompt: string;
   readonly patterns: readonly Pattern[];
+  /**
+   * Pre-engine routing decision. Either a registered pattern name (engine
+   * begins at `confirm-fit`) or the literal string `"new"` (engine begins
+   * at `classify-complexity` to draft a fresh pattern). The agent picks
+   * this by reading `symphony list-patterns --json` before invoking the
+   * engine; the engine itself does not route.
+   */
+  readonly pattern: string;
   /** Optional clock injector used for startedAt. */
   readonly clock?: () => string;
   /** Optional pauseId generator. Defaults to crypto.randomUUID. Tests inject a deterministic factory. */
