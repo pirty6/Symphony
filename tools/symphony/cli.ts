@@ -39,7 +39,20 @@ import { beatLegality } from "./legality";
 import { parseAlgorithm, compileScore, type AlgorithmInput } from "../compiler/compile";
 import { getPattern, listPatterns } from "../patterns";
 import { scaffoldPerformance } from "./perform";
+import { appendLog } from "../cli-shared/log";
 import type { Beat, ExecutableScore, SavedRun } from "./types";
+
+/**
+ * Wrap a runXxx that returns an exit code so every dispatch logs an
+ * input event (with the args), runs the command, then logs the exit
+ * code on the output side.
+ */
+function dispatch(cmd: string, inputs: Record<string, unknown>, run: () => number): void {
+  appendLog("symphony", cmd, "input", inputs);
+  const code = run();
+  appendLog("symphony", cmd, "output", { exitCode: code });
+  process.exit(code);
+}
 
 function readJson<T>(file: string): T {
   return JSON.parse(fs.readFileSync(file, "utf8")) as T;
@@ -277,7 +290,10 @@ function main(): void {
             type: "string",
             demandOption: true,
           }),
-      (a) => process.exit(runFromPattern({ pattern: a.pattern, input: a.input, out: a.out })),
+      (a) =>
+        dispatch("from-pattern", { pattern: a.pattern, input: a.input, out: a.out }, () =>
+          runFromPattern({ pattern: a.pattern, input: a.input, out: a.out }),
+        ),
     )
     .command(
       "parse",
@@ -294,7 +310,10 @@ function main(): void {
             type: "string",
             demandOption: true,
           }),
-      (a) => process.exit(runParse({ input: a.input, out: a.out })),
+      (a) =>
+        dispatch("parse", { input: a.input, out: a.out }, () =>
+          runParse({ input: a.input, out: a.out }),
+        ),
     )
     .command(
       "scaffold-performance",
@@ -311,7 +330,10 @@ function main(): void {
             type: "string",
             demandOption: true,
           }),
-      (a) => process.exit(runScaffold({ score: a.score, out: a.out })),
+      (a) =>
+        dispatch("scaffold-performance", { score: a.score, out: a.out }, () =>
+          runScaffold({ score: a.score, out: a.out }),
+        ),
     )
     .command(
       "save-run",
@@ -330,8 +352,10 @@ function main(): void {
             demandOption: true,
           }),
       (a) =>
-        process.exit(
-          runSaveRun({ pattern: a.pattern, score: a.score, performance: a.performance }),
+        dispatch(
+          "save-run",
+          { pattern: a.pattern, score: a.score, performance: a.performance },
+          () => runSaveRun({ pattern: a.pattern, score: a.score, performance: a.performance }),
         ),
     )
     .command(
@@ -348,13 +372,16 @@ function main(): void {
             describe: "Optional fresh Performance JSON to diff against",
             type: "string",
           }),
-      (a) => process.exit(runVerify({ file: a.file, replayAgainst: a["replay-against"] })),
+      (a) =>
+        dispatch("verify", { file: a.file, replayAgainst: a["replay-against"] }, () =>
+          runVerify({ file: a.file, replayAgainst: a["replay-against"] }),
+        ),
     )
     .command(
       "library-index",
       "Rebuild tools/scores/index.json from saved runs",
       (y) => y,
-      () => process.exit(runLibraryIndex()),
+      () => dispatch("library-index", {}, () => runLibraryIndex()),
     )
     .demandCommand(1, "Specify a subcommand.")
     .help()

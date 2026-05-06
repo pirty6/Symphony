@@ -48,6 +48,7 @@ import {
   writeState,
 } from "./utils";
 import { listPatterns } from "../patterns";
+import { appendLog } from "../cli-shared/log";
 
 // ── Public types ────────────────────────────────────────────────────
 
@@ -63,15 +64,24 @@ export const VOICE_PRODUCERS: readonly VoiceProducer[] = [
 // ── Runs ───────────────
 
 export function runStart(prompt: string, pattern: string, stateFile: string): void {
+  appendLog("maestro", "start", "input", { prompt, pattern, stateFile });
   const state = createEngine({ prompt, pattern, patterns: listPatterns() });
   if (state.kind === "failed") {
+    appendLog("maestro", "start", "output", { kind: "failed", error: state.error });
     process.stderr.write(`ENGINE ERROR: ${state.error}\n`);
     process.exit(1);
   }
   writeState(stateFile, state);
   if (state.kind === "running") {
+    appendLog("maestro", "start", "output", {
+      kind: "running",
+      pauseKind: state.pause.kind,
+      pauseId: state.pause.pauseId,
+    });
     emitPauseAndExit(state);
+    return;
   }
+  appendLog("maestro", "start", "output", { kind: "done" });
   emitDoneAndExit(state);
 }
 
@@ -80,19 +90,39 @@ export function runResolve(stateFile: string, resolutionRaw: string): void {
   try {
     resolution = JSON.parse(resolutionRaw) as Resolution;
   } catch (e) {
+    appendLog("maestro", "resolve", "input", {
+      stateFile,
+      parseError: (e as Error).message,
+    });
     process.stderr.write(`RESOLUTION PARSE ERROR: ${(e as Error).message}\n`);
     process.exit(1);
   }
   const prior = readState(stateFile);
+  appendLog("maestro", "resolve", "input", {
+    stateFile,
+    priorKind: prior.kind,
+    priorPauseKind: prior.kind === "running" ? prior.pause.kind : undefined,
+    priorPauseId: prior.kind === "running" ? prior.pause.pauseId : undefined,
+    resolutionKind: resolution.kind,
+    resolutionPauseId: resolution.pauseId,
+  });
   const next = advance(prior, resolution);
   writeState(stateFile, next);
   if (next.kind === "failed") {
+    appendLog("maestro", "resolve", "output", { kind: "failed", error: next.error });
     process.stderr.write(`ENGINE ERROR: ${next.error}\n`);
     process.exit(1);
   }
   if (next.kind === "done") {
+    appendLog("maestro", "resolve", "output", { kind: "done" });
     emitDoneAndExit(next);
+    return;
   }
+  appendLog("maestro", "resolve", "output", {
+    kind: "running",
+    pauseKind: next.pause.kind,
+    pauseId: next.pause.pauseId,
+  });
   emitPauseAndExit(next);
 }
 

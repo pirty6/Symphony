@@ -26,6 +26,9 @@
  *     and the related env-var pitfall (a missing pauseId gets dropped
  *     by JSON.stringify and then rejected by the engine).
  *
+ * Set `SYMPHONY_LOG=<file>` to append JSONL telemetry across all
+ * Symphony CLIs (maestro, symphony, patterns). Unset = no logging.
+ *
  * State file format is engine-internal and opaque to the caller.
  */
 import * as fs from "node:fs";
@@ -33,7 +36,7 @@ import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import { runStart, runResolve } from "./engine";
 
-// ── CLI definition ─────────────────────────────────────────────────
+// ── CLI definition ─────────────────────────────────
 
 function maestroCli(): void {
   yargs(hideBin(process.argv))

@@ -16,8 +16,10 @@ import { hideBin } from "yargs/helpers";
 
 import { getPattern, listPatterns } from "./index";
 import { renderPatternMarkdown } from "./render";
+import { appendLog } from "../cli-shared/log";
 
 function runList(opts: { readonly json: boolean }): number {
+  appendLog("patterns", "list", "input", { json: opts.json });
   const patterns = listPatterns();
   if (opts.json) {
     const out = patterns.map((p) => ({
@@ -28,6 +30,7 @@ function runList(opts: { readonly json: boolean }): number {
       beats: p.score.beats.length,
     }));
     process.stdout.write(JSON.stringify(out, undefined, 2) + "\n");
+    appendLog("patterns", "list", "output", { count: patterns.length, format: "json" });
     return 0;
   }
   process.stdout.write(`Available patterns (${patterns.length}):\n`);
@@ -38,12 +41,15 @@ function runList(opts: { readonly json: boolean }): number {
     );
     process.stdout.write(`    ${p.description}\n`);
   }
+  appendLog("patterns", "list", "output", { count: patterns.length, format: "text" });
   return 0;
 }
 
 function runView(opts: { readonly pattern: string; readonly out?: string }): number {
+  appendLog("patterns", "view", "input", { pattern: opts.pattern, out: opts.out });
   const pattern = getPattern(opts.pattern);
   if (!pattern) {
+    appendLog("patterns", "view", "output", { kind: "unknown", pattern: opts.pattern });
     process.stderr.write(`UNKNOWN PATTERN: ${opts.pattern}\n`);
     return 1;
   }
@@ -54,8 +60,10 @@ function runView(opts: { readonly pattern: string; readonly out?: string }): num
     process.stdout.write(
       `OK rendered:\n  pattern = ${pattern.score.pattern}\n  out     = ${opts.out}\n`,
     );
+    appendLog("patterns", "view", "output", { kind: "file", out: opts.out });
   } else {
     process.stdout.write(md);
+    appendLog("patterns", "view", "output", { kind: "stdout" });
   }
   return 0;
 }
