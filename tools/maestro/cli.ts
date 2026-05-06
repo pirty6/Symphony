@@ -18,12 +18,17 @@
  *     `--pattern` is required: pass a registered pattern name (see
  *     `symphony list-patterns`) or "new" to draft a fresh one.
  *
- *   maestro resolve --state <file> --resolution <json>
+ *   maestro resolve --state <file> (--resolution <json> | --resolution-file <path>)
  *     Apply one Resolution. Updates --state in place. Prints next
  *     Pause (exit 2) or final Performance (exit 0) or error (exit 1).
+ *     Exactly one of --resolution / --resolution-file must be given.
+ *     Prefer --resolution-file: it sidesteps shell-quoting hazards
+ *     and the related env-var pitfall (a missing pauseId gets dropped
+ *     by JSON.stringify and then rejected by the engine).
  *
  * State file format is engine-internal and opaque to the caller.
  */
+import * as fs from "node:fs";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import { runStart, runResolve } from "./engine";
@@ -71,12 +76,30 @@ function maestroCli(): void {
             demandOption: true,
           })
           .option("resolution", {
-            describe: "Resolution JSON; must echo the current Pause's pauseId",
+            describe: "Resolution JSON inline; must echo the current Pause's pauseId",
             type: "string",
-            demandOption: true,
+          })
+          .option("resolution-file", {
+            describe:
+              "Path to a JSON file with the Resolution; preferred over --resolution to avoid shell-quoting hazards",
+            type: "string",
+          })
+          .check((a) => {
+            const inline = typeof a.resolution === "string" && a.resolution.length > 0;
+            const file =
+              typeof a["resolution-file"] === "string" &&
+              (a["resolution-file"] as string).length > 0;
+            if (inline === file) {
+              throw new Error("Provide exactly one of --resolution or --resolution-file");
+            }
+            return true;
           }),
-      ({ state, resolution }) => {
-        runResolve(state, resolution);
+      ({ state, resolution, "resolution-file": resolutionFile }) => {
+        const raw =
+          typeof resolutionFile === "string"
+            ? fs.readFileSync(resolutionFile, "utf8")
+            : (resolution as string);
+        runResolve(state, raw);
       },
     )
     .demandCommand(1, "Specify a subcommand: `start` or `resolve`.")
