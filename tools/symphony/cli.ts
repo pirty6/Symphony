@@ -6,10 +6,16 @@
  *   from-pattern  --pattern <name> --input <input.json> --out <score.json>
  *   parse         --input <algorithm.json> --out <score.json>
  *   scaffold-performance --score <score.json> --out <performance.json>
+ *   perform       --score <score.json> --inputs <inputs.json> --out <performance.json>
  *   save-run      --pattern <name> --score <s.json> --performance <p.json>
  *   verify        --file <savedrun.json>
  *                 [--replay-against <fresh-performance.json>]
  *   library-index
+ *
+ * `perform` runs the shared `runPerformance` executor (used by
+ * `tools/maestro/engine.ts` for interactive runs and by this command
+ * for non-interactive batch runs). Inputs is a JSON array of
+ * `{ voiceOutputs, verdict }` records, one per beat.
  *
  * Catalog reads (`patterns list`, `patterns view`) live in
  * `tools/patterns/cli.ts`. Symphony still imports `getPattern` for
@@ -39,6 +45,7 @@ import { beatLegality } from "./legality";
 import { parseAlgorithm, compileScore, type AlgorithmInput } from "../compiler/compile";
 import { getPattern, listPatterns } from "../patterns";
 import { scaffoldPerformance } from "./perform";
+import { runPerformance, type PerformBeatInput } from "./perform-runner";
 import { appendLog } from "../cli-shared/log";
 import type { Beat, ExecutableScore, SavedRun } from "./types";
 
@@ -144,6 +151,45 @@ function runScaffold(opts: { readonly score: string; readonly out: string }): nu
   writeJson(out, performance);
   process.stdout.write(
     `OK scaffold:\n  scoreId  = ${performance.scoreId}\n  beats    = ${performance.beats.length}\n  outcome  = ${performance.outcome}\n  out      = ${out}\n`,
+  );
+  return 0;
+}
+
+function runPerform(opts: {
+  readonly score: string;
+  readonly inputs: string;
+  readonly out: string;
+}): number {
+  const { score: scoreFile, inputs: inputsFile, out } = opts;
+  let score: ExecutableScore;
+  try {
+    score = loadExecutableScore(scoreFile);
+  } catch (err) {
+    process.stderr.write(`LOAD ERROR: ${(err as Error).message}\n`);
+    return 1;
+  }
+  let inputs: readonly PerformBeatInput[];
+  try {
+    const raw = readJson<unknown>(inputsFile);
+    if (!Array.isArray(raw)) {
+      process.stderr.write(`INPUT ERROR: --inputs must be a JSON array of PerformBeatInput\n`);
+      return 1;
+    }
+    inputs = raw as readonly PerformBeatInput[];
+  } catch (err) {
+    process.stderr.write(`READ ERROR: ${(err as Error).message}\n`);
+    return 1;
+  }
+  const result = runPerformance(score, inputs);
+  if (result.kind === "failed") {
+    process.stderr.write(
+      `PERFORM ERROR (beat ${result.beatIndex}): ${result.error}\n`,
+    );
+    return 1;
+  }
+  writeJson(out, result.performance);
+  process.stdout.write(
+    `OK performed:\n  scoreId  = ${result.performance.scoreId}\n  beats    = ${result.performance.beats.length} / ${score.beats.length}\n  outcome  = ${result.performance.outcome}\n  out      = ${out}\n`,
   );
   return 0;
 }
@@ -333,6 +379,31 @@ function main(): void {
       (a) =>
         dispatch("scaffold-performance", { score: a.score, out: a.out }, () =>
           runScaffold({ score: a.score, out: a.out }),
+        ),
+    )
+    .command(
+      "perform",
+      "Execute an ExecutableScore against a JSON inputs file, emit Performance",
+      (y) =>
+        y
+          .option("score", {
+            describe: "ExecutableScore JSON path",
+            type: "string",
+            demandOption: true,
+          })
+          .option("inputs", {
+            describe: "JSON array of { voiceOutputs, verdict } records (one per beat)",
+            type: "string",
+            demandOption: true,
+          })
+          .option("out", {
+            describe: "Output Performance JSON path",
+            type: "string",
+            demandOption: true,
+          }),
+      (a) =>
+        dispatch("perform", { score: a.score, inputs: a.inputs, out: a.out }, () =>
+          runPerform({ score: a.score, inputs: a.inputs, out: a.out }),
         ),
     )
     .command(
