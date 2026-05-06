@@ -14,18 +14,11 @@ const score: PatternScore = {
   domain: "refactor",
   beats: [
     {
-      step: "name",
-      level: 1,
-      instrument: "order",
-      directive:
-        "Name target — concretely. The structural change to perform (rename, merge, extract, move, etc.) is in context.target.",
-    },
-    {
-      step: "pin",
+      step: "frame",
       level: 4,
-      instrument: "decide",
+      instrument: "analyze",
       directive:
-        "Pin invariant — the behavior contract preserved across the change is in context.invariant. State what is allowed to change (import paths, file layout, internal names).",
+        "Frame the change — name the structural target (context.target) and pin the invariant preserved across it (context.invariant); state explicitly what is allowed to change (import paths, file layout, internal names).",
     },
     {
       step: "survey",

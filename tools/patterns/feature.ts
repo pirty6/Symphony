@@ -13,10 +13,11 @@ const score: PatternScore = {
   domain: "feature",
   beats: [
     {
-      step: "define",
+      step: "frame",
       level: 4,
-      instrument: "decide",
-      directive: "Define scope — inputs, outputs, and boundary. Pulled from context.scope.",
+      instrument: "analyze",
+      directive:
+        "Frame the feature — restate scope (context.scope), contract (context.contract), and any knownEdges. Confirm the boundary is concrete enough for the survey to start.",
     },
     {
       step: "survey",
@@ -24,13 +25,6 @@ const score: PatternScore = {
       instrument: "question",
       directive:
         "Survey neighbors — locate the modules, types, and conventions the feature will touch.",
-    },
-    {
-      step: "specify",
-      level: 4,
-      instrument: "analyze",
-      directive:
-        "Specify contract — public signature, data shapes, error modes. Pulled from context.contract. Known edges from context.knownEdges (if any) feed the next beat.",
     },
     {
       step: "test",

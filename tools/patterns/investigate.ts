@@ -3,10 +3,6 @@
  *
  * Answer a question about an existing system without modifying it.
  * Output is understanding plus a list of follow-ups, not a code change.
- *
- * Both clarify modes (restate / decompose) are emitted as separate
- * beats. The runtime executor picks one based on the prompt's shape;
- * the other gets `outcome: "skipped"` on the Performance.
  */
 
 import type { Pattern, PatternScore } from "./types";
@@ -16,18 +12,11 @@ const score: PatternScore = {
   domain: "investigate",
   beats: [
     {
-      step: "clarify-restate",
-      level: 1,
-      instrument: "order",
-      directive:
-        "Restate the user's prompt as the question to be investigated. Pass-through; no decomposition. Skip when the prompt is multi-part or fuzzy — clarify-decompose handles that case.",
-    },
-    {
-      step: "clarify-decompose",
+      step: "clarify",
       level: 5,
       instrument: "integrate",
       directive:
-        "Decompose the prompt into concrete answerable sub-questions or a numbered list of items. Skip when the prompt is single-question and clean — clarify-restate handles that case. If the prompt has many items and the output of this beat is a single sentence, this beat was done wrong.",
+        "Restate the prompt as the question to investigate. If multi-part or fuzzy, decompose into a numbered list of sub-questions instead. Single-question prompts get a one-line restatement; multi-part prompts get a list.",
     },
     {
       step: "scope",
@@ -44,18 +33,11 @@ const score: PatternScore = {
         "Locate references — find every direct and indirect use: dynamic dispatch, string keys, serialization, runtime config, type-only usages. Grep alone is insufficient. Repo-specific locate hints come from context.locateHints when present.",
     },
     {
-      step: "read",
+      step: "trace",
       level: 3,
       instrument: "analyze",
       directive:
-        "Read semantics — at each reference, capture what the code actually does, not what its name suggests. One summary per reference.",
-    },
-    {
-      step: "map",
-      level: 3,
-      instrument: "analyze",
-      directive:
-        "Map relationships — describe how in-scope items depend on, produce, or consume each other.",
+        "For each reference from `locate`, capture what the code actually does (not what its name suggests) and how it relates to the other in-scope items. One entry per reference, plus a short relationships paragraph.",
     },
     {
       step: "hypothesize",
@@ -65,18 +47,11 @@ const score: PatternScore = {
         "Test hypotheses — per sub-question or item, propose a claim and actively seek counter-evidence (callers that contradict, tests that pin it down, invariants that survive).",
     },
     {
-      step: "classify",
-      level: 4,
-      instrument: "decide",
-      directive:
-        "Classify findings — bucket each item: keep / remove / change / unresolved. The 'unresolved' bucket is real; do not force a verdict.",
-    },
-    {
-      step: "synthesize",
+      step: "answer",
       level: 5,
       instrument: "integrate",
       directive:
-        "Synthesize answer — answer every sub-question; mark explicitly which are answered, which are partial, which remain open.",
+        "Answer every sub-question (mark answered / partial / open) and bucket each item (keep / remove / change / unresolved). The 'unresolved' / 'open' buckets are real — do not force verdicts.",
     },
     {
       step: "recommend",
