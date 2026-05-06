@@ -22,7 +22,7 @@ interface BasePause {
 
 export interface PatternSummary {
   readonly pattern: string;
-  readonly matchedVerb: string;
+  readonly description: string;
 }
 
 type MatchPatternPause = BasePause & {
@@ -37,7 +37,7 @@ type ConfirmFitPattern = BasePause & {
   readonly kind: ConfirmFit;
   readonly payload: {
     readonly pattern: string;
-    readonly matchedVerb: string;
+    readonly description: string;
   };
 };
 
@@ -53,7 +53,10 @@ type DraftPatternRoundPause = BasePause & {
   readonly payload: {
     readonly round: number;
     readonly maxRounds: number;
+    /** Effective complexity for this round (may be escalated above baseHint). */
     readonly complexity: Complexity;
+    /** Original tier from classify-complexity; used to escalate on subsequent rounds. */
+    readonly baseHint: Complexity;
     readonly priorDraft: Pattern | undefined;
   };
 };

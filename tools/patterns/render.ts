@@ -11,12 +11,6 @@
 
 import type { Pattern } from "./types";
 
-function formatTriggers(triggers: readonly string[]): string {
-  return triggers
-    .map((t) => (t.includes(" ") ? `"${t}"` : t))
-    .join(", ");
-}
-
 function formatRequiredContext(req: readonly string[]): string {
   return req.length === 0 ? "(none)" : req.map((k) => `\`${k}\``).join(", ");
 }
@@ -28,7 +22,7 @@ export function renderPatternMarkdown(pattern: Pattern): string {
   lines.push("---");
   lines.push(`pattern: ${ps.pattern}`);
   lines.push(`domain: ${ps.domain}`);
-  lines.push(`verb-triggers: [${formatTriggers(pattern.verbTriggers)}]`);
+  lines.push(`description: ${pattern.description}`);
   lines.push(
     `required-context: ${pattern.requiredContext.length === 0 ? "[]" : `[${pattern.requiredContext.join(", ")}]`}`,
   );

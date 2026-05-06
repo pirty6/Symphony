@@ -65,11 +65,12 @@ export interface PatternScore {
 /**
  * A reusable algorithm template.
  *
- * `score` is the static skeleton. `verbTriggers` and `requiredContext`
- * are routing metadata: the phrases maestro scans for at pattern-pick
- * time, and the repo-specific keys the compiler refuses to compile
- * without. Both are owned by the Pattern, not by the PatternScore —
- * a PatternScore is the algorithm's shape, not its routing rules.
+ * `score` is the static skeleton. `description` is the one-line
+ * summary the maestro shows to the routing agent at pattern-pick
+ * time. `requiredContext` lists the repo-specific keys the compiler
+ * refuses to compile without. All three are owned by the Pattern,
+ * not by the PatternScore — a PatternScore is the algorithm's shape,
+ * not its routing rules.
  *
  * Missing required keys halt compilation — that is how the v1 "no
  * target → halt and route to investigate" rule for refactor is now
@@ -77,8 +78,8 @@ export interface PatternScore {
  */
 export interface Pattern {
   readonly score: PatternScore;
-  /** Phrases the maestro Setup phase scans for at routing time. */
-  readonly verbTriggers: readonly string[];
+  /** One-line summary shown at the match-pattern pause. */
+  readonly description: string;
   /** Keys that must be present in the ExecutableScore's `context` field. */
   readonly requiredContext: readonly string[];
 }

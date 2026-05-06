@@ -1,7 +1,6 @@
 import type { Pattern } from "../../patterns";
 import type { ExecutableScore, Performance, PerformedBeat } from "../../symphony/types";
 import type { Pause } from "./pause";
-import type { Complexity } from "./types";
 
 export interface EngineConfig {
   readonly prompt: string;
@@ -22,10 +21,9 @@ export interface InternalState {
   /** Static + drafted patterns, all carried as data. */
   readonly patterns: readonly Pattern[];
   /** Active pattern is referenced by name; resolve via patterns[]. */
-  readonly active: { readonly patternName: string; readonly matchedVerb: string } | undefined;
+  readonly active: { readonly patternName: string } | undefined;
   readonly context: Readonly<Record<string, string>>;
   readonly draftRound: number;
-  readonly debateComplexityHint: Complexity;
   readonly score: ExecutableScore | undefined;
   readonly performedBeats: readonly PerformedBeat[];
   readonly startedAt: string;

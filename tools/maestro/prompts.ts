@@ -20,7 +20,7 @@ export function composerPromptFor(pause: Pause): string {
     case "match-pattern":
       return matchComposer(pause.payload.prompt, pause.payload.candidates);
     case "confirm-fit":
-      return confirmComposer(pause.payload.pattern, pause.payload.matchedVerb);
+      return confirmComposer(pause.payload.pattern, pause.payload.description);
     case "classify-complexity":
       return classifyComposer(pause.payload.prompt);
     case "draft-pattern-round":
@@ -61,12 +61,12 @@ export function instrumentPromptFor(pause: Pause): string {
 
 function matchComposer(prompt: string, candidates: readonly PatternSummary[]): string {
   return [
-    "Multiple patterns match the user's prompt. Decide which one applies.",
+    "Pick the pattern that best fits the user's prompt.",
     "",
     `Prompt: ${prompt}`,
     "",
     "Candidates:",
-    ...candidates.map((c) => `  - ${c.pattern}  (matched verb: '${c.matchedVerb}')`),
+    ...candidates.map((c) => `  - ${c.pattern}: ${c.description}`),
     "",
     "Reply with: { kind: 'match-pattern', chosen: '<name>' | 'no-match' }",
   ].join("\n");
@@ -76,12 +76,12 @@ function matchInstrument(candidates: readonly PatternSummary[]): string {
   return `Pick one of: ${candidates.map((c) => c.pattern).join(", ")} or 'no-match'.`;
 }
 
-function confirmComposer(pattern: string, matchedVerb: string): string {
+function confirmComposer(pattern: string, description: string): string {
   return [
-    `Pattern fit check. Matched verb '${matchedVerb}' → '${pattern}'.`,
+    `Pattern fit check. '${pattern}': ${description}.`,
     "",
     "Confirm in one sentence to the user, like:",
-    `  > This is a '${pattern}' problem (matched verb: '${matchedVerb}').`,
+    `  > This is a '${pattern}' problem. ${description}`,
     "",
     "If they object, reply with reroute=<other-pattern>.",
     "Reply with: { kind: 'confirm-fit', ok: boolean, reroute?: string }",

@@ -90,11 +90,7 @@ const score: PatternScore = {
 
 export const investigatePattern: Pattern = {
   score,
-  verbTriggers: [
-    "investigate", "explore", "understand", "clarify", "analyze",
-    "assess", "evaluate", "examine",
-    "how does", "why does", "what is", "is there",
-    "should we keep", "is X still useful",
-  ],
+  description:
+    "Investigate, explore, or explain something about the codebase \u2014 understand how it works, why it behaves a certain way, what something is for, or assess whether to keep it.",
   requiredContext: [],
 };

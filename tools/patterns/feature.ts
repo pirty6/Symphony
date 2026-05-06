@@ -73,8 +73,7 @@ const score: PatternScore = {
 
 export const featurePattern: Pattern = {
   score,
-  verbTriggers: [
-    "build", "create", "add", "implement", "introduce", "ship", "develop",
-  ],
+  description:
+    "Build, add, or ship a new feature \u2014 introduce new functionality with a clear contract and integration into the existing system.",
   requiredContext: ["scope", "contract"],
 };

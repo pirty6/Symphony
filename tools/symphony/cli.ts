@@ -338,7 +338,7 @@ function runListPatterns(args: CliArgs): number {
     const out = patterns.map((p) => ({
       pattern: p.score.pattern,
       domain: p.score.domain,
-      verbTriggers: p.verbTriggers,
+      description: p.description,
       requiredContext: p.requiredContext,
       beats: p.score.beats.length,
     }));
@@ -351,9 +351,7 @@ function runListPatterns(args: CliArgs): number {
     process.stdout.write(
       `  ${p.score.pattern.padEnd(14)} domain=${p.score.domain.padEnd(16)} requiredContext=${reqd}\n`,
     );
-    process.stdout.write(
-      `    verbs: ${p.verbTriggers.map((v) => (v.includes(" ") ? `"${v}"` : v)).join(", ")}\n`,
-    );
+    process.stdout.write(`    ${p.description}\n`);
   }
   return 0;
 }

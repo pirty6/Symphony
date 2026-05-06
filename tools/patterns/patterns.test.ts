@@ -16,31 +16,10 @@ describe("PatternLibrary", () => {
     expect(getPattern("nope")).toBeUndefined();
   });
 
-  test("every pattern has at least one verb trigger and a non-empty beat list", () => {
+  test("every pattern has a non-empty description and beat list", () => {
     for (const p of listPatterns()) {
-      expect(p.verbTriggers.length).toBeGreaterThan(0);
+      expect(p.description.length).toBeGreaterThan(0);
       expect(p.score.beats.length).toBeGreaterThan(0);
-    }
-  });
-
-  test("verb triggers are unique within each pattern", () => {
-    for (const p of listPatterns()) {
-      expect(new Set(p.verbTriggers).size).toBe(p.verbTriggers.length);
-    }
-  });
-
-  test("verb triggers do not collide across patterns", () => {
-    const seen = new Map<string, string>();
-    for (const p of listPatterns()) {
-      for (const trigger of p.verbTriggers) {
-        const prev = seen.get(trigger);
-        if (prev !== undefined) {
-          throw new Error(
-            `verb trigger "${trigger}" appears in both ${prev} and ${p.score.pattern}`,
-          );
-        }
-        seen.set(trigger, p.score.pattern);
-      }
     }
   });
 
@@ -58,7 +37,7 @@ describe("renderPatternMarkdown", () => {
     if (!investigate) {throw new Error("investigate pattern not found");}
     const md = renderPatternMarkdown(investigate);
     expect(md).toContain("pattern: investigate");
-    expect(md).toContain("verb-triggers: [");
+    expect(md).toContain("description:");
     expect(md).toContain("# investigate");
     expect(md).toContain("## Beats");
     expect(md).toContain("## Annotation table");

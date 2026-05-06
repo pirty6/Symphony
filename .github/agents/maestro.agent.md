@@ -88,26 +88,31 @@ you're about to send.
 
 ---
 
-## The six Pause kinds
+## The seven Pause kinds
 
 ### `match-pattern`
 
-The prompt matched multiple patterns' `verbTriggers` (or zero, after a
-rejected confirm-fit). You see `payload.candidates`. Pick one that
-matches the user's intent, or `"no-match"` to enter draft-pattern.
+Always the **first** pause emitted by `createEngine`. The engine
+offers every registered pattern as a candidate and asks you to pick
+the one that fits the user's prompt. Each candidate carries a
+`description: string` field summarizing the pattern's intent — read
+the descriptions, weigh them against the prompt, and pick the closest
+match, or `"no-match"` to enter the draft-pattern path.
+
+`payload.candidates: ReadonlyArray<{ pattern: string; description: string }>`
 
 > Resolution: `{ "kind": "match-pattern", "pauseId": "<echo>", "chosen": "<pattern>" | "no-match" }`
 
 ### `confirm-fit`
 
-The engine identified a single likely pattern and is asking you to
-double-check fit before any context is collected. State the pattern in
-one sentence so the user can object:
+After you pick a pattern at `match-pattern`, the engine surfaces it
+back for a final fit check before any context is collected. State the
+pattern in one sentence so the user can object:
 
-> _"This is a `refactor` problem (matched verb: `rename`). I'll use the `refactor` pattern."_
+> _"This is a `refactor` problem. I'll use the `refactor` pattern."_
 
-If the user objects with a different pattern name, send `ok=false` with
-`reroute=<name>` — the engine will emit a fresh `confirm-fit` on that
+If the user objects with a different pattern name, send `ok=false`
+with `reroute=<name>` — the engine emits a fresh `confirm-fit` on that
 pattern (it does not silently skip; you re-confirm with the user).
 If the user objects but doesn't name a target, send `ok=false` alone —
 the engine re-emits `match-pattern` with every registered pattern.
@@ -115,21 +120,32 @@ the engine re-emits `match-pattern` with every registered pattern.
 > Resolution: `{ "kind": "confirm-fit", "pauseId": "<echo>", "ok": true }`
 > or `{ "kind": "confirm-fit", "pauseId": "<echo>", "ok": false, "reroute": "<pattern>" }`
 
+### `classify-complexity`
+
+Reached only after you choose `"no-match"` at `match-pattern` (or
+reject every reroute at `confirm-fit`). Before drafting a new pattern,
+the engine asks how much debate the design needs. This pause is _only_
+emitted as a precursor to draft-pattern — patterns are pre-debated
+artifacts, so picking a registered pattern never triggers it.
+
+Pick the lowest tier that still covers the risk:
+
+| Complexity | Sub-agents to spawn during draft |
+| ---------- | -------------------------------- |
+| 1          | proposer alone                   |
+| 2          | proposer + skeptic               |
+| 3          | proposer + skeptic + pragmatist  |
+| 4          | all four (adds template-critic)  |
+
+> Resolution: `{ "kind": "classify-complexity", "pauseId": "<echo>", "complexity": 1 | 2 | 3 | 4 }`
+
 ### `draft-pattern-round`
 
-No pattern matched, or you sent `"no-match"`. The engine is asking for
-one round of design. `payload.debateComplexity` ∈ 1..4 tells you which
-sub-agents to spawn:
-
-| Complexity | Sub-agents                      |
-| ---------- | ------------------------------- |
-| 1          | proposer alone (you synthesize) |
-| 2          | proposer + skeptic              |
-| 3          | proposer + skeptic + pragmatist |
-| 4          | all four (adds template-critic) |
-
-Round 1 honors `debateComplexityHint` (default 2). Each subsequent round
-escalates one tier, capped at 4. The engine enforces `MAX_ROUNDS = 6`.
+The engine is asking for one round of pattern design. `payload.complexity`
+∈ 1..4 is the effective tier for this round; `payload.baseHint` is the
+original classification. Round 1 uses `baseHint` directly; subsequent
+rounds escalate one tier per round, capped at 4. The engine enforces
+`MAX_ROUNDS = 6`.
 
 Synthesize a draft `Pattern` and show it to the user. Classify the
 response:
@@ -242,9 +258,9 @@ npx tsx tools/symphony/cli.ts verify --file <returned-path>
 
 These cannot be violated, even by accident:
 
-- **Routing matches `verbTriggers`** — you cannot drive a pattern that
-  doesn't match (you would have to send `match-pattern` choosing it
-  explicitly, which the engine validates against the registry).
+- **Routing requires an explicit pick** — every run starts at
+  `match-pattern`. You cannot drive a pattern without choosing it (the
+  engine validates the choice against the registry).
 - **`requiredContext` is complete and non-empty** before compile.
 - **Only canonical go phrases** advance past `go-gate`.
 - **`MAX_ROUNDS = 6`** in draft-pattern; round 7 fails the run.

@@ -74,10 +74,7 @@ const score: PatternScore = {
 
 export const refactorPattern: Pattern = {
   score,
-  verbTriggers: [
-    "refactor", "rename", "consolidate", "extract", "inline", "simplify",
-    "regroup", "reorganize", "restructure", "dedupe", "merge", "split",
-    "move",
-  ],
+  description:
+    "Restructure existing code without changing observable behavior \u2014 rename, extract, inline, consolidate, dedupe, move, split.",
   requiredContext: ["target", "invariant"],
 };
