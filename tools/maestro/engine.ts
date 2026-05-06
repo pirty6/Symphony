@@ -529,7 +529,6 @@ function finishRun(
 
 // ── Pause builders ──────────────────────────────────────────────────
 
-
 function makeElicitPause(
   pattern: Pattern,
   collected: Readonly<Record<string, string>>,

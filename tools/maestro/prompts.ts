@@ -55,7 +55,6 @@ export function instrumentPromptFor(pause: Pause): string {
 
 // ── Builders ───────────────────────────────────────────────────────
 
-
 function confirmComposer(pattern: string, description: string): string {
   return [
     `Pattern fit check. '${pattern}': ${description}.`,

@@ -3,8 +3,6 @@
  *
  * Subcommands cover the data flow from pattern to persisted SavedRun:
  *
- *   list-patterns
- *   pattern view  --pattern <name> [--out <file.md>]
  *   from-pattern  --pattern <name> --input <input.json> --out <score.json>
  *   parse         --input <algorithm.json> --out <score.json>
  *   scaffold-performance --score <score.json> --out <performance.json>
@@ -12,6 +10,10 @@
  *   verify        --file <savedrun.json>
  *                 [--replay-against <fresh-performance.json>]
  *   library-index
+ *
+ * Catalog reads (`patterns list`, `patterns view`) live in
+ * `tools/patterns/cli.ts`. Symphony still imports `getPattern` for
+ * compile + persistence; it just doesn't surface catalog UI.
  *
  * `from-pattern` and `parse` produce a loose ExecutableScore. The
  * Performance is filled in by maestro / the executor. `save-run`
@@ -36,7 +38,6 @@ import { writeLibraryIndex } from "../scores/library";
 import { beatLegality } from "./legality";
 import { parseAlgorithm, compileScore, type AlgorithmInput } from "../compiler/compile";
 import { getPattern, listPatterns } from "../patterns";
-import { renderPatternMarkdown } from "../patterns/render";
 import { scaffoldPerformance } from "./perform";
 import type { Beat, ExecutableScore, SavedRun } from "./types";
 
@@ -255,86 +256,11 @@ function runLibraryIndex(): number {
   return 0;
 }
 
-function runListPatterns(opts: { readonly json: boolean }): number {
-  const patterns = listPatterns();
-  if (opts.json) {
-    const out = patterns.map((p) => ({
-      pattern: p.score.pattern,
-      domain: p.score.domain,
-      description: p.description,
-      requiredContext: p.requiredContext,
-      beats: p.score.beats.length,
-    }));
-    process.stdout.write(JSON.stringify(out, undefined, 2) + "\n");
-    return 0;
-  }
-  process.stdout.write(`Available patterns (${patterns.length}):\n`);
-  for (const p of patterns) {
-    const reqd = p.requiredContext.length > 0 ? p.requiredContext.join(",") : "\u2014";
-    process.stdout.write(
-      `  ${p.score.pattern.padEnd(14)} domain=${p.score.domain.padEnd(16)} requiredContext=${reqd}\n`,
-    );
-    process.stdout.write(`    ${p.description}\n`);
-  }
-  return 0;
-}
-
-function runPatternView(opts: { readonly pattern: string; readonly out?: string }): number {
-  const pattern = getPattern(opts.pattern);
-  if (!pattern) {
-    process.stderr.write(`UNKNOWN PATTERN: ${opts.pattern}\n`);
-    return 1;
-  }
-  const md = renderPatternMarkdown(pattern);
-  if (opts.out) {
-    fs.mkdirSync(path.dirname(opts.out), { recursive: true });
-    fs.writeFileSync(opts.out, md, "utf8");
-    process.stdout.write(
-      `OK rendered:\n  pattern = ${pattern.score.pattern}\n  out     = ${opts.out}\n`,
-    );
-  } else {
-    process.stdout.write(md);
-  }
-  return 0;
-}
-
 function main(): void {
   yargs(hideBin(process.argv))
     .scriptName("symphony")
     .strict()
     .version(false)
-    .command(
-      "list-patterns",
-      "List registered patterns (with descriptions and required context)",
-      (y) =>
-        y.option("json", {
-          describe: "Emit machine-readable JSON instead of the human summary",
-          type: "boolean",
-          default: false,
-        }),
-      (a) => process.exit(runListPatterns({ json: a.json })),
-    )
-    .command(
-      "pattern <subcommand>",
-      "Pattern operations",
-      (y) =>
-        y
-          .positional("subcommand", {
-            describe: "Pattern operation",
-            choices: ["view"] as const,
-            demandOption: true,
-          })
-          .option("pattern", {
-            describe: "Pattern name",
-            type: "string",
-            demandOption: true,
-          })
-          .option("out", {
-            describe: "Optional file path; otherwise prints to stdout",
-            type: "string",
-          }),
-      (a) => process.exit(runPatternView({ pattern: a.pattern, out: a.out })),
-    )
     .command(
       "from-pattern",
       "Compile a registered Pattern + input.json into an ExecutableScore",

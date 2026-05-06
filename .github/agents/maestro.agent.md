@@ -35,7 +35,7 @@ the literal string `"new"` to draft a fresh pattern):
 
 ```bash
 # 1. List patterns. Each entry has { pattern, domain, description, requiredContext, beats }.
-npx tsx tools/symphony/cli.ts list-patterns --json
+npx tsx tools/patterns/cli.ts list --json
 
 # 2. Read the descriptions, weigh them against the user's prompt, pick one.
 #    Use "new" if no registered pattern fits and you want to draft a new one.
