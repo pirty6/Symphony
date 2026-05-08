@@ -22,7 +22,7 @@ You receive from maestro:
 4. **Proposer's draft**
 5. **Skeptic's output**
 6. **Pragmatist's output** — including any WRONG PATTERN flags
-7. **Available patterns** — output of `npx tsx tools/symphony/cli.ts list-patterns`
+7. **Available patterns** — output of `npx tsx /Users/perezgarciam/Documents/git/Symphony/tools/symphony/cli.ts list-patterns`
 
 ## Output contract
 

@@ -1,311 +1,56 @@
-# Symphony Architecture
+# Maestro and Symphony, from scratch
 
-A pattern for building deterministic, auditable AI agent workflows using state machines, structured prompt hand-offs, and strict role separation.
+## The problem they solve
 
-> **Two names, one product.** The repo is **Symphony** (the pattern).
-> **Maestro** is the agent that runs it ([.github/agents/maestro*.agent.md](.github/agents)).
-> The runtime types maestro produces and consumes (`ExecutableScore`, `Beat`,
-> `Performance`) live in [tools/symphony/](tools/symphony) — same name as the
-> repo, narrower scope.
+When you ask a chat AI to do a multi-step coding task ("refactor this", "add this feature", "investigate this bug"), the AI plans the steps _and_ executes them in the same head. It can skip steps, hallucinate that it did things it didn't, or drift mid-task. There's no referee.
 
----
+Symphony and Maestro are this repo's answer: **separate the planning from the doing, and put a non-AI program in charge of the order.**
 
-## Core Idea
-
-Split every AI workflow into two strands — the **Double Helix**:
+## The two halves
 
-1. **Deterministic strand** (`score.sh`) — a bash state machine that controls flow and
-   pauses with `exit 2` when a decision is needed.
-2. **Intelligence strand** (Composer + Instruments) — AI agents that act only at
-   explicit pause points, never in the middle of control flow.
+- **Symphony** is the _idea and the data shapes_. It says: every task is a sequence of small, named steps called **beats**. The full plan — the list of beats plus the inputs they need — is a **Score** (think: musical sheet music). The recording of what actually happened when you ran it is a **Performance**. Both are JSON files saved to disk, so you can audit, replay, and diff runs.
 
-The state machine is the Score. The agents are the Performers. The Stage is the pipe
-that connects them.
+- **Maestro** is the _program that runs a Score_. It's a small state machine in TypeScript (engine.ts). It decides what to do next; the AI only fills in the parts that need judgment.
 
----
+## A Pattern is a pre-built Score template
 
-## The Four Roles (Three Layers)
+The repo ships three Patterns (patterns):
 
-| Layer          | Role           | What it does                                                                                                                         |  Edit files?  | Spawn agents? |
-| -------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------ | :-----------: | :-----------: |
-| Infrastructure | **Stage**      | Pure pipe — runs bash, routes output. Zero decisions.                                                                                |       ✗       |       ✗       |
-| Infrastructure | **Score**      | `score.sh` — deterministic state machine. Never writes files, never spawns agents.                                                   |       ✗       |       ✗       |
-| Direction      | **Composer**   | Owns the full resolution loop. Reads Score instructions. Spawns Assessors for evidence. Decides. Spawns Executors. Re-invokes Score. |       ✗       |       ✓       |
-| Performance    | **Instrument** | Does the actual work. Two sub-types: **Assessor** (read-only + viability judgment) and **Executor** (sole write path).               | Executor only |       ✗       |
-
-### Why this split matters
-
-- Stage and Score are deterministic — no AI hallucination in control flow
-- Composer cannot corrupt state — no write permission, only spawn permission
-- Assessor cannot corrupt state — read-only
-- Executor is the only write path, and only after the Composer confirms viability
-- **Mistakes are contained to the judgment layer**
-
----
-
-## File Structure
-
-Every Symphony skill needs at least three files, plus optional `lib/` and `test-score.sh`:
-
-```
-skills/my-skill/
-  SKILL.md           # Stage instructions
-  score.sh           # Deterministic state machine (bash)
-  prompts.sh         # Paired prompt templates
-  test-score.sh      # Tests (structural + behavioral)
-  lib/               # Complex scripts called by score.sh
-    analyze.ts       #   TypeScript, Node, etc.
-    transform.sh     #   Heavier bash logic
-```
-
-### `score.sh` — The State Machine
-
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
-: "${REQUIRED_VAR:?REQUIRED_VAR must be set}"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-. "${SCRIPT_DIR}/prompts.sh"
-
-emit_composer()   { printf 'COMPOSER_INSTRUCTIONS_BEGIN\n%s\nCOMPOSER_INSTRUCTIONS_END\n' "$1"; }
-emit_instrument() { printf 'INSTRUMENT_INSTRUCTIONS_BEGIN\n%s\nINSTRUMENT_INSTRUCTIONS_END\n' "$1"; }
-
-judgment() {
-  local jtype="$1" composer="$2" instrument="$3"; shift 3
-  echo "JUDGMENT_REQUEST: $jtype"
-  echo "REVIEW_CONTEXT_BEGIN"
-  local kv; for kv in "$@"; do [[ "${kv#*=}" != "" ]] && echo "$kv"; done
-  echo "REVIEW_CONTEXT_END"
-  emit_composer "$composer"
-  emit_instrument "$instrument"
-  exit 2
-}
+- **`feature`** — add a new capability
+- **`refactor`** — restructure code without changing behavior
+- **`investigate`** — answer a question about the codebase
 
-# Phase 1 → Phase N: deterministic work
-# Call judgment() when AI intelligence is required
-exit 0
-```
-
-**Exit codes:** `0` = success, `1` = fatal failure, `2` = judgment needed.
-
-### `lib/` — Complex Scripts
-
-When a phase needs logic that's awkward in bash (parsing, data transforms, API calls),
-put it in `lib/` as a standalone script. `score.sh` calls these via `npx tsx`:
-
-```bash
-# score.sh calls a TypeScript script
-result=$(npx tsx "${SCRIPT_DIR}/lib/analyze.ts" --input "$data" 2>&1) || {
-  judgment "analysis-failed" \
-    "$(prompt_analysis_failed_composer)" \
-    "$(prompt_analysis_failed_instrument)" \
-    "error=$result"
-}
-```
-
-Lib scripts follow the same exit code contract as `score.sh`:
-
-| Exit | Meaning                                        |
-| ---- | ---------------------------------------------- |
-| `0`  | Success — stdout has the result                |
-| `1`  | Fatal failure — stderr has the error           |
-| `2`  | Judgment needed — stdout has structured output |
-
-Lib scripts must be **deterministic and testable** — no AI calls, no side effects
-beyond their explicit output. They're part of the Score layer, not the Intelligence
-layer.
-
-```typescript
-// lib/analyze.ts — Example lib script.
+Each Pattern is just a list of beats in a specific order. For example, refactor's beats are: `frame → survey → capture → plan → execute → verify → prune`. Each beat has a directive (what to do) and a tag for what kind of work it is (read-only analysis vs. file edit vs. decision).
 
-interface AnalysisResult {
-  result: string;
-}
+These Patterns were _pre-debated_ — humans argued about the right beat sequence once, saved it, and now every refactor follows the same proven script. You don't re-derive the playbook every time.
 
-function analyze(data: Record<string, unknown>): AnalysisResult {
-  // Deterministic work...
-  return { result: "ok" };
-}
-
-const args = process.argv.slice(2);
-const inputIdx = args.indexOf("--input");
-if (inputIdx === -1 || inputIdx + 1 >= args.length) {
-  console.error("--input is required");
-  process.exit(1);
-}
+## How a prompt flows through Maestro
 
-try {
-  const result = analyze(JSON.parse(args[inputIdx + 1]));
-  console.log(JSON.stringify(result));
-  process.exit(0);
-} catch (e) {
-  console.error(String(e));
-  process.exit(1);
-}
-```
+You type something like _"refactor the prompts to use fewer tokens"_. Then:
 
-### `prompts.sh` — The Prompt Templates
+1. **Pick a Pattern.** `feature`, `refactor`, `investigate`, or `new` (let Maestro draft a custom one).
+2. **Maestro pauses and asks: "is this Pattern a good fit?"** You say yes or reroute.
+3. **Maestro asks for the missing inputs.** Each Pattern declares required fields (refactor needs `target` and `invariant`). Maestro refuses to advance until you fill them in. No guessing.
+4. **Go gate.** Maestro asks for explicit approval. Only specific phrases work: `go`, `approved`, `proceed`, `looks good`, `ship it`. Vague approval is rejected.
+5. **Beat-by-beat execution.** For each beat, Maestro spawns a small specialized AI:
+   - **Assessor** — read-only. Searches code, reads files, returns findings.
+   - **Executor** — write-only. Applies file edits as instructed.
+     The engine validates each AI's response shape (right fields, valid confidence number, valid outcome). Malformed responses are rejected.
+6. **Done.** A `Performance` JSON file is saved to store recording what every beat did. You can re-verify or replay it later.
 
-Paired functions for every judgment type:
+## Why this beats a normal chat agent
 
-```bash
-#!/usr/bin/env bash
+Imagine a chat agent doing the same refactor. It reads your prompt, picks an approach in its head, edits files, claims it ran tests. If it skipped a step or made up a result, you only find out when something breaks.
 
-prompt_<type>_composer() {
-  cat <<'PROMPT'
-What the Composer should do with the judgment result.
-PROMPT
-}
+|                                 | Plain chat agent                | Chat agent + skill file  | Maestro / Symphony                |
+| ------------------------------- | ------------------------------- | ------------------------ | --------------------------------- |
+| Who decides the next step?      | The AI                          | The AI (guided by prose) | A state machine in code           |
+| Required inputs enforced?       | No                              | "Please"                 | Engine refuses to advance         |
+| Read and write done by same AI? | Yes                             | Yes                      | No — separate Assessor & Executor |
+| Response shape checked?         | No                              | No                       | Yes, every beat                   |
+| Audit trail?                    | Chat log                        | Chat log                 | JSON artifact you can replay      |
+| Failure mode                    | Hallucinated steps slip through | Skill quietly ignored    | State machine simply won't move   |
 
-prompt_<type>_instrument() {
-  cat <<'PROMPT'
-Instrument-Assessor. ALLOWED TOOLS: <explicit list>.
-What to investigate. Return structured findings.
-PROMPT
-}
-```
+**The core shift:** in a chat, the AI's instructions are _suggestions it may follow loosely_. In Maestro, the same instructions are _rules the engine enforces_. The AI is only trusted with the parts that genuinely need judgment ("does this Pattern fit?", "did this beat achieve its directive?") — the _order_, the _gates_, and the _shape of the work_ are owned by code, not by the model.
 
-**Invariants:**
-
-- Every judgment type has **both** `_composer()` and `_instrument()` — no orphans
-- Every `_instrument()` declares `ALLOWED TOOLS:` — explicit allowlist
-- Both functions return non-empty output
-
-### `SKILL.md` — The Stage Instructions
-
-Tells the consumer to run bash, route exit codes, and hand off to the Composer.
-The Stage makes zero decisions.
-
----
-
-## Judgment Flow
-
-```
-score.sh exit 2 + structured blocks
-  └─> Stage hands output to Composer
-        └─> Composer spawns Assessor
-              └─> Assessor returns APPROACH_VIABLE=YES|NO + findings
-        └─> Composer decides to proceed or skip
-        └─> Composer spawns Executor (if proceeding)
-        └─> Composer re-invokes score.sh
-```
-
-The exit-2 output always contains two blocks:
-
-```
-COMPOSER_INSTRUCTIONS_BEGIN … COMPOSER_INSTRUCTIONS_END
-INSTRUMENT_INSTRUCTIONS_BEGIN … INSTRUMENT_INSTRUCTIONS_END
-```
-
----
-
-## Permission Model
-
-| Role                | Edit files? | Spawn agents? | Read/web? | Viability judgment? |
-| ------------------- | :---------: | :-----------: | :-------: | :-----------------: |
-| Stage               |      ✗      |       ✗       |     ✗     |          ✗          |
-| Score               |      ✗      |       ✗       |     ✗     |          ✗          |
-| Composer            |      ✗      |       ✓       |     ✓     |    ✗ (delegates)    |
-| Instrument-Assessor |      ✗      |       ✗       |     ✓     |          ✓          |
-| Instrument-Executor |      ✓      |       ✗       |     ✓     |          ✗          |
-
----
-
-## Testing
-
-Every Symphony skill has a `test-score.sh` with two categories of tests:
-
-### Structural Tests (Role Pairing Guards)
-
-These prevent accidental role removal during refactoring:
-
-**1. Prompt Pairing** — every `_composer()` has a matching `_instrument()`:
-
-```bash
-composers=$(grep -oE '^prompt_[a-z_]+_composer\(' prompts.sh | sed 's/_composer(//;s/^prompt_//' | sort)
-instruments=$(grep -oE '^prompt_[a-z_]+_instrument\(' prompts.sh | sed 's/_instrument(//;s/^prompt_//' | sort)
-# Assert sets are equal
-```
-
-**2. Non-Empty Prompts** — source `prompts.sh`, call every `prompt_*()`, assert non-empty.
-
-**3. ALLOWED TOOLS** — every `*_instrument()` output contains `ALLOWED TOOLS:`.
-
-### Behavioral Tests
-
-Test `score.sh` and `lib/` scripts directly:
-
-```bash
-# Test score.sh exit codes
-output=$(env REPO_ROOT=/tmp bash score.sh 2>&1) || exit_code=$?
-assert_eq "exits 0 on happy path" "0" "${exit_code:-0}"
-
-# Test lib scripts
-output=$(npx tsx lib/analyze.ts --input '{"test": true}' 2>&1) || exit_code=$?
-assert_eq "analyze.ts exits 0" "0" "${exit_code:-0}"
-assert_contains "returns JSON" '"result"' "$output"
-```
-
-### Watch Mode
-
-Run tests automatically on every file change:
-
-```bash
-bash run-tests-watch.sh skills/my-skill
-```
-
-Uses `fswatch` if available (instant reload), falls back to 2s polling.
-Watches `*.sh`, `*.ts`, `*.md` in the skill directory.
-
----
-
-## Composability
-
-An Executor can itself be a Symphony. Inner symphony exit codes bubble up to the outer
-Composer:
-
-```
-Outer Symphony
-  └── Executor = inner score.sh
-        ├── Phase 1
-        ├── Phase 2 (may exit 2 → outer Composer handles)
-        └── Phase 3
-```
-
----
-
-## How to Build a New Symphony
-
-1. Identify the phases (deterministic steps)
-2. Identify judgment calls (where AI intelligence is needed)
-3. Write `score.sh` — phases + `judgment()` calls at pause points
-4. Write `prompts.sh` — paired `_composer()` + `_instrument()` for each judgment type
-5. Add `lib/` scripts — for any logic too complex for bash (TypeScript, Node, etc.)
-6. Write `SKILL.md` — Stage instructions
-7. Write `test-score.sh` — structural tests + behavioral tests for score.sh and lib/
-8. Set up watch mode — `bash run-tests-watch.sh skills/my-skill`
-9. Register agents — Composer and Assessor entries in your agent list
-
-### Checklist per judgment call
-
-- [ ] `score.sh` calls `judgment()` with type, composer prompt, instrument prompt, context vars
-- [ ] `prompts.sh` has `prompt_<type>_composer()` — non-empty, tells Composer what to do
-- [ ] `prompts.sh` has `prompt_<type>_instrument()` — non-empty, declares `ALLOWED TOOLS:`
-- [ ] `test-score.sh` triggers this exit 2
-- [ ] Structural tests verify the pairing exists
-
----
-
-## Key Design Decisions
-
-| Decision                               | Reason                                                                                  |
-| -------------------------------------- | --------------------------------------------------------------------------------------- |
-| Bash for the state machine             | Deterministic, auditable, testable — no AI hallucination in control flow                |
-| Paired prompts                         | Composer decides _what to do_; Assessor decides _what the evidence shows_ — never mixed |
-| `ALLOWED TOOLS:` in instrument prompts | Explicit tool allowlists are the security boundary per judgment type                    |
-| One-shot vars with `unset`             | Prevents judgment results from leaking to subsequent phases or re-invocations           |
-| Max invocation guard                   | Prevents infinite loops — force `exit 1` after N re-invocations                         |
-| `exit 2` pause protocol                | Clean boundary between deterministic and AI layers — no in-band signaling               |
-| `lib/` for complex scripts             | TypeScript/Node scripts follow the same exit code contract; tested alongside score.sh   |
-| Watch mode testing                     | Instant feedback loop — structural + behavioral tests on every save                     |
+A skill tells the AI what _should_ happen. Symphony refuses to continue when it doesn't.

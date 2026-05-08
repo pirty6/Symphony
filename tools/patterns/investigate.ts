@@ -13,8 +13,8 @@ const score: PatternScore = {
   beats: [
     {
       step: "clarify",
-      level: 5,
-      instrument: "integrate",
+      level: 3,
+      instrument: "order",
       directive:
         "Restate the prompt as the question to investigate. If multi-part or fuzzy, decompose into a numbered list of sub-questions instead. Single-question prompts get a one-line restatement; multi-part prompts get a list.",
     },
@@ -30,7 +30,7 @@ const score: PatternScore = {
       level: 2,
       instrument: "analyze",
       directive:
-        "Locate references — find every direct and indirect use: dynamic dispatch, string keys, serialization, runtime config, type-only usages. Grep alone is insufficient. Repo-specific locate hints come from context.locateHints when present.",
+        "Locate references — use LSP go-to-references as the primary signal; grep is a supplement for the cases LSP misses (string keys, serialization, dynamic dispatch, runtime config, type-only usages). Output a deduplicated list of `file:line` references, each tagged by how it was found (LSP / grep / dynamic). Repo-specific locate hints come from context.locateHints when present.",
     },
     {
       step: "trace",
@@ -44,14 +44,14 @@ const score: PatternScore = {
       level: 4,
       instrument: "question",
       directive:
-        "Test hypotheses — per sub-question or item, propose a claim and actively seek counter-evidence (callers that contradict, tests that pin it down, invariants that survive).",
+        "Per sub-question, propose a claim and actively seek counter-evidence (callers that contradict, tests that pin it down, invariants that survive). Output one record per claim: `{claim, verdict: confirmed|falsified|inconclusive, evidence}`. Falsified claims are still output — `answer` consumes them.",
     },
     {
       step: "answer",
       level: 5,
       instrument: "integrate",
       directive:
-        "Answer every sub-question (mark answered / partial / open) and bucket each item (keep / remove / change / unresolved). The 'unresolved' / 'open' buckets are real — do not force verdicts.",
+        "Answer every sub-question (mark answered / partial / open) and bucket each item (keep / remove / change / unresolved). Synthesize confirmed and inconclusive hypotheses into the answer; surface falsified hypotheses as 'believed X, evidence Y says otherwise' so the epistemic delta is visible. The 'unresolved' / 'open' buckets are real — do not force verdicts.",
     },
     {
       step: "recommend",
