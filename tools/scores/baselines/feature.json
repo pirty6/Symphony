@@ -1,6 +1,11 @@
 {
   "patternName": "feature",
-  "sourceFile": null,
-  "capturedAt": null,
-  "metrics": null
+  "sourceFile": "tools/scores/store/feature/3c3bc61562ea7996-2026-05-08T23-33-03-051Z.json",
+  "capturedAt": "2026-05-08T23:33:03.051Z",
+  "metrics": {
+    "beatCount": 7,
+    "spawnCount": 7,
+    "wallMs": 574967,
+    "meanConfidence": 0.95
+  }
 }
