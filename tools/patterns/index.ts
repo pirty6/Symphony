@@ -10,11 +10,13 @@ import type { Pattern } from "./types";
 import { investigatePattern } from "./investigate";
 import { refactorPattern } from "./refactor";
 import { featurePattern } from "./feature";
+import { fixPattern } from "./fix";
 
 const ENTRIES: readonly Pattern[] = [
   investigatePattern,
   refactorPattern,
   featurePattern,
+  fixPattern,
 ];
 
 const BY_NAME: ReadonlyMap<string, Pattern> = new Map(
@@ -29,7 +31,7 @@ export function listPatterns(): readonly Pattern[] {
   return ENTRIES;
 }
 
-export { investigatePattern, refactorPattern, featurePattern };
+export { investigatePattern, refactorPattern, featurePattern, fixPattern };
 export type {
   Pattern,
   PatternScore,

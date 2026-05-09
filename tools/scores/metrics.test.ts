@@ -195,7 +195,7 @@ interface BaselineFile {
 }
 
 describe("non-regression", () => {
-  const patterns = ["feature", "investigate", "refactor"] as const;
+  const patterns = ["feature", "fix", "investigate", "refactor"] as const;
   for (const pattern of patterns) {
     const baselinePath = path.resolve(__dirname, "baselines", `${pattern}.json`);
     const baseline: BaselineFile = JSON.parse(fs.readFileSync(baselinePath, "utf8"));
@@ -217,7 +217,7 @@ describe("non-regression", () => {
 });
 
 describe("baseline-validity", () => {
-  const patterns = ["feature", "investigate", "refactor"] as const;
+  const patterns = ["feature", "fix", "investigate", "refactor"] as const;
   for (const pattern of patterns) {
     const baselinePath = path.resolve(__dirname, "baselines", `${pattern}.json`);
     it(`${pattern}: baseline JSON has well-formed shape`, () => {

@@ -10,6 +10,7 @@ describe("PatternLibrary", () => {
     expect(getPattern("investigate")?.score.pattern).toBe("investigate");
     expect(getPattern("refactor")?.score.pattern).toBe("refactor");
     expect(getPattern("feature")?.score.pattern).toBe("feature");
+    expect(getPattern("fix")?.score.pattern).toBe("fix");
   });
 
   test("getPattern returns undefined for unknown name", () => {
@@ -21,6 +22,21 @@ describe("PatternLibrary", () => {
       expect(p.description.length).toBeGreaterThan(0);
       expect(p.score.beats.length).toBeGreaterThan(0);
     }
+  });
+
+  test("fix pattern has expected step sequence", () => {
+    const fix = getPattern("fix");
+    if (!fix) {
+      throw new Error("fix pattern not found");
+    }
+    expect(fix.score.beats.map((b) => b.step)).toEqual([
+      "reproduce",
+      "diagnose",
+      "fix",
+      "regress",
+      "lint",
+    ]);
+    expect(fix.requiredContext).toEqual(["bug", "reproduction"]);
   });
 
   test("beat steps are unique within each pattern", () => {

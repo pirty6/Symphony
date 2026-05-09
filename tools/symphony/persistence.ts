@@ -31,6 +31,8 @@ import type {
   VerdictDelta,
 } from "./types";
 
+import { writeLibraryIndex } from "../scores/library";
+
 // ── Hashing ────────────────────────────────────────────────────────
 
 function sha256(input: string): string {
@@ -113,12 +115,14 @@ export function savedRunPath(run: SavedRun, root: string = STORE_DIR): string {
  * Persist a SavedRun under tools/scores/store/<pattern>/. The whole
  * SavedRun (snapshot + executable + performance) is written as a
  * single JSON file; there are no separate score.json / performance.json
- * files anymore.
+ * files anymore. After writing, the library index is rebuilt to keep
+ * tools/scores/index.json in sync.
  */
 export function saveRun(run: SavedRun, root: string = STORE_DIR): string {
   const file = savedRunPath(run, root);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify(run, undefined, 2) + "\n", "utf8");
+  writeLibraryIndex(root, path.join(root, "..", "index.json"));
   return file;
 }
 

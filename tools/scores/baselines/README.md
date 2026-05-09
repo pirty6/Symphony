@@ -65,3 +65,25 @@ Workflow:
 ## LINT_BEAT enforces oxlint clean
 
 `tools/patterns/shared.ts` exports `LINT_BEAT`, the canonical lint-enforcement step. Patterns that touch source code should include `LINT_BEAT` near the end of their beat sequence (typically after `verify`, before any terminal `prune`). The beat halts if `oxlint` does not exit 0 — every error must either be fixed or explicitly suppressed with a rationale.
+
+## Seeding a brand-new pattern (no SavedRun yet)
+
+When a pattern is registered before any real run has been captured (e.g. the initial commit that introduces it), commit a placeholder baseline with `metrics: null` and no fixture file:
+
+```json
+{
+  "patternName": "<name>",
+  "sourceFile": null,
+  "capturedAt": null,
+  "metrics": null
+}
+```
+
+The `non-regression` block in `tools/scores/metrics.test.ts` skips patterns with `metrics === null`, and `baseline-validity` accepts the placeholder shape. Once the pattern has been exercised against a real target:
+
+1. Run it through maestro and capture the SavedRun under `tools/scores/store/<name>/`.
+2. Copy that SavedRun to `tools/scores/fixtures/<name>.json`.
+3. Compute `runMetrics` from the fixture and rewrite `baselines/<name>.json` with real `sourceFile`, `capturedAt`, and `metrics`.
+4. Commit the fixture and baseline together.
+
+This is the workflow for `fix.json` today: registered, placeholder baseline only, no fixture — the next real bug repair run populates both.
