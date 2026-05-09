@@ -1,0 +1,238 @@
+{
+  "schemaVersion": 1,
+  "patternScore": {
+    "pattern": "investigate",
+    "domain": "investigate",
+    "beats": [
+      {
+        "step": "clarify",
+        "level": 3,
+        "instrument": "order",
+        "directive": "Restate the prompt as the question to investigate. If multi-part or fuzzy, decompose into a numbered list of sub-questions instead. Single-question prompts get a one-line restatement; multi-part prompts get a list."
+      },
+      {
+        "step": "scope",
+        "level": 3,
+        "instrument": "order",
+        "directive": "Scope inventory — enumerate the items, files, or behaviors in bounds and explicitly mark what is out. Repo-specific scope qualifiers come from context.scope when present."
+      },
+      {
+        "step": "map",
+        "level": 3,
+        "instrument": "analyze",
+        "directive": "Map references — use LSP go-to-references as the primary signal; grep is a supplement for the cases LSP misses (string keys, serialization, dynamic dispatch, runtime config, type-only usages). Output a deduplicated list of `file:line` references, each tagged by how it was found (LSP / grep / dynamic). For each reference, capture what the code actually does (not what its name suggests) and how it relates to the other in-scope items — one entry per reference. Close with a short relationships paragraph. Repo-specific locate hints come from context.locateHints when present."
+      },
+      {
+        "step": "hypothesize",
+        "level": 4,
+        "instrument": "question",
+        "directive": "Per sub-question, propose a claim and actively seek counter-evidence (callers that contradict, tests that pin it down, invariants that survive). Output one record per claim: `{claim, verdict: confirmed|falsified|inconclusive, evidence}`. Falsified claims are still output — `answer` consumes them."
+      },
+      {
+        "step": "answer",
+        "level": 5,
+        "instrument": "integrate",
+        "directive": "Answer every sub-question (mark answered / partial / open) and bucket each item (keep / remove / change / unresolved). Synthesize confirmed and inconclusive hypotheses into the answer; surface falsified hypotheses as 'believed X, evidence Y says otherwise' so the epistemic delta is visible. The 'unresolved' / 'open' buckets are real — do not force verdicts."
+      },
+      {
+        "step": "recommend",
+        "level": 5,
+        "instrument": "order",
+        "directive": "Recommend follow-ups — per item, list next actions tagged with the target pattern (refactor, feature, decide, or 'no action')."
+      }
+    ]
+  },
+  "executableScore": {
+    "schemaVersion": 1,
+    "frequencyMap": {
+      "key": "investigate",
+      "activeLevels": [
+        3,
+        5
+      ]
+    },
+    "beats": [
+      {
+        "level": 3,
+        "voices": [
+          {
+            "instrument": "order"
+          }
+        ],
+        "directive": "Restate the prompt as the question to investigate. If multi-part or fuzzy, decompose into a numbered list of sub-questions instead. Single-question prompts get a one-line restatement; multi-part prompts get a list."
+      },
+      {
+        "level": 3,
+        "voices": [
+          {
+            "instrument": "order"
+          }
+        ],
+        "directive": "Scope inventory — enumerate the items, files, or behaviors in bounds and explicitly mark what is out. Repo-specific scope qualifiers come from context.scope when present."
+      },
+      {
+        "level": 3,
+        "voices": [
+          {
+            "instrument": "analyze"
+          }
+        ],
+        "directive": "Map references — use LSP go-to-references as the primary signal; grep is a supplement for the cases LSP misses (string keys, serialization, dynamic dispatch, runtime config, type-only usages). Output a deduplicated list of `file:line` references, each tagged by how it was found (LSP / grep / dynamic). For each reference, capture what the code actually does (not what its name suggests) and how it relates to the other in-scope items — one entry per reference. Close with a short relationships paragraph. Repo-specific locate hints come from context.locateHints when present."
+      },
+      {
+        "level": 4,
+        "voices": [
+          {
+            "instrument": "question"
+          }
+        ],
+        "directive": "Per sub-question, propose a claim and actively seek counter-evidence (callers that contradict, tests that pin it down, invariants that survive). Output one record per claim: `{claim, verdict: confirmed|falsified|inconclusive, evidence}`. Falsified claims are still output — `answer` consumes them."
+      },
+      {
+        "level": 5,
+        "voices": [
+          {
+            "instrument": "integrate"
+          }
+        ],
+        "directive": "Answer every sub-question (mark answered / partial / open) and bucket each item (keep / remove / change / unresolved). Synthesize confirmed and inconclusive hypotheses into the answer; surface falsified hypotheses as 'believed X, evidence Y says otherwise' so the epistemic delta is visible. The 'unresolved' / 'open' buckets are real — do not force verdicts."
+      },
+      {
+        "level": 5,
+        "voices": [
+          {
+            "instrument": "order"
+          }
+        ],
+        "directive": "Recommend follow-ups — per item, list next actions tagged with the target pattern (refactor, feature, decide, or 'no action')."
+      }
+    ],
+    "generatedFrom": {
+      "rawHash": "94d77890f894074150e0f0999ea14d5d2a738e7f478821ec224c9a9ea121449e",
+      "canonicalHash": "94d77890f894074150e0f0999ea14d5d2a738e7f478821ec224c9a9ea121449e",
+      "schemaVersion": 1
+    },
+    "pattern": "investigate",
+    "context": {},
+    "id": "80f9dcc012ef137034f0409f623ecc5ef670931c55ec329e0ad1c3b30c7bc8f3",
+    "generatedAt": "2026-05-08T22:23:11.723Z"
+  },
+  "performance": {
+    "scoreId": "80f9dcc012ef137034f0409f623ecc5ef670931c55ec329e0ad1c3b30c7bc8f3",
+    "beats": [
+      {
+        "beatIndex": 0,
+        "voices": [
+          {
+            "instrument": "order",
+            "output": "1. What is the exact shape of SavedRun in tools/scores/store, and which fields already capture quality signals vs performance signals?\n2. How does tools/scores/library.ts and persistence currently load/index/query saved runs — can it support baseline selection (e.g. 'latest green run for pattern X') and historical comparison?\n3. What performance metrics does the maestro engine and pattern runner currently emit (spawn count, beat count, wall time, per-beat timings), and where would a regression detector hook in?\n4. How is quality currently assessed for LLM outputs in this repo, and what would a reproducible automated quality-baseline check look like given non-determinism?\n5. What does the jest + tsc safety net cover today, and where would baseline/regression assertions belong — unit tests, separate bench runner, or CI step?\n6. How deterministic is replay of a SavedRun, and what gaps must be closed before replay can serve as the substrate for regression detection?\n7. What thresholds/tolerances/alerting policy should govern regression detection, and where configured?\n8. What are the ranked design options (tagged small/medium/large; engine vs pattern/tooling) and their tradeoffs?",
+            "confidence": 0.9,
+            "producedBy": "maestro-assessor"
+          }
+        ],
+        "verdict": {
+          "outcome": "applied",
+          "confidence": 0.9,
+          "reason": "Decomposed into 8 crisp sub-questions covering shape, persistence, metrics, quality, safety net, replay, policy, recommendation.",
+          "shouldTerminate": false
+        },
+        "stateHash": "3a12e92c5be6827d901dd5b9feea84b816510dbc5dc9792e165f77c1b80486c5"
+      },
+      {
+        "beatIndex": 1,
+        "voices": [
+          {
+            "instrument": "order",
+            "output": "IN SCOPE:\n- tools/scores/store/{refactor,investigate,feature}/*.json — 5 refactor + 1 investigate SavedRun artifacts (existing run history)\n- tools/scores/library.ts — sole .ts in tools/scores/; primary scoring API surface (no types.ts)\n- tools/symphony/persistence.ts, perform.ts, perform-runner.ts — run/pause persistence + beat runner (timing instrumentation seam)\n- tools/symphony/cli.ts — where bench/baseline subcommands would attach\n- tools/symphony/{validation,legality,types}.ts + persistence.test.ts — adjacent modules\n- tools/maestro/engine.ts — currently NO perf/timing emission (no hrtime/Date.now/elapsed)\n- tools/maestro/cli.ts, prompts.ts — CLI hook + prompt-assembly seam\n- tools/patterns/*.ts — 8 files (index, cli, types, render, refactor, feature, investigate, patterns.test)\n- tools/patterns/refactor.ts — only file that already mentions 'baseline' (semantic, not measured: context.baselineCommand verify-equivalence)\n- package.json — scripts: test/typecheck/lint/fmt; NO bench/baseline script today\n- tools/jest.config.js, tsconfig*.json\n- Grep for baseline|bench|regression|rubric|judge: ZERO infra files. Only prose hits in refactor.ts and one comment in compile.test.ts.\n\nOUT OF SCOPE:\n- Prompt body content (only the emission seam matters)\n- .claude/, node_modules/, dist/, .git/, README/LICENSE\n- tools/cli-shared, tools/compiler/*, maestro engine.test\n\nGAPS:\n- No tools/scores/types.ts; library.ts is sole module\n- No existing perf/quality harness — greenfield\n- 'baseline' today is a refactor-pattern PROSE concept, not a measured artifact",
+            "confidence": 0.9,
+            "producedBy": "maestro-assessor"
+          }
+        ],
+        "verdict": {
+          "outcome": "applied",
+          "confidence": 0.9,
+          "reason": "Inventoried in/out scope, confirmed greenfield (no existing perf/quality harness), identified emission seams.",
+          "shouldTerminate": false
+        },
+        "stateHash": "60cdeca1d258443cfc22c1e3b6f5876e390cc80bd43f3316ce970ad340e85a25"
+      },
+      {
+        "beatIndex": 2,
+        "voices": [
+          {
+            "instrument": "analyze",
+            "output": "REFERENCES (file:line — what — bearing on baselines):\n\n[read] tools/symphony/types.ts:165-172 — Performance has startedAt/completedAt/outcome/beats — wall-clock derivable today; per-beat timing not modeled.\n[read] tools/symphony/types.ts:148-162 — PerformedVoice has instrument/output/confidence/producedBy; PerformedBeat has beatIndex/voices/verdict/stateHash — spawn count = voices.length per beat; producedBy already labels assessor vs executor; no latency/token/tool-call fields.\n[read] tools/symphony/types.ts:91-96 — MoveVerdict {outcome, confidence, shouldTerminate, reason} — confidence is the ONLY existing quality scalar.\n[read] tools/symphony/types.ts:184-194 — SavedRun {schemaVersion, patternScore, executableScore, performance, problemFingerprint, timestamp} — persisted unit; baseline fields hang off Performance/PerformedBeat (schema-bumped).\n[read] tools/symphony/perform.ts:64-99 — performScore calls clock() at start+end only — seam #1 for per-beat timing.\n[read] tools/symphony/perform-runner.ts:97-160 — runPerformance synchronous fold, clock() start+end, builds PerformedBeat in for-loop — seam #2 for per-beat timing.\n[read] tools/symphony/persistence.ts:48-72 — computeExecutableScoreId hashes only PLAN fields — adding timing/quality to Performance is SAFE (won't perturb scoreId or replay).\n[read] tools/symphony/persistence.ts:170-241 — detectDivergence has 4 axes (structural/semantic/environmental/prose); natural place to add 5th=performance and 6th=quality.\n[read] tools/symphony/cli.ts:217-260 — runVerify already prints outcome/beats/divergence — obvious surface for --baseline / --regress-against flag.\n[read] tools/scores/library.ts:75-90 — SavedRunIndexEntry indexes outcome/beats/activeLevels/domain/pattern/problemFingerprint — query layer for 'all runs of pattern X', first place to surface aggregate p50/p95 once timing lands.\n[read] tools/maestro/engine.ts:421-454 — resolvePerformBeat constructs PerformedBeat from a single Resolution; engine itself does NOT track timing/spawn count, just records what agent submits. Per-beat timing must be added either to Resolution payload (caller-measured) or by wrapping clock() in runResolve.\n[read] tools/maestro/engine.ts:143-201 — runResolve reads state/advances/writes/exits; no timing capture — seam #3 for wall-clock per turn without changing wire format.\n[read] tools/maestro/cli.ts — `done` emitted by emitDoneAndExit(state); place to append a baseline-summary block.\n[read] tools/patterns/refactor.ts:30-37,44-51 — only existing 'baseline' notion in the repo: prose context.baselineCommand for refactor verify-equivalence. NOT stored, NOT compared automatically.\n[read] tools/patterns/types.ts:30-43 — PatternBeat has only step/level/instrument/directive — no rubric slot; quality baseline would need new optional qualityRubric field.\n[read] tools/scores/store/investigate/4355cbf...json — actual SavedRun: ~10m33s wall, 7 beats, every voice has producedBy populated. Wall-clock baseline computable today.\n[read] tools/scores/store/refactor/ — 5 saved runs (2026-05-06..05-08); enough for first p50/p95 per pattern with ZERO schema changes.\n[read] package.json:14-20 — scripts: lint/fmt:check/test/typecheck. NO bench, NO judge harness.\n[grep] tools/** for Date.now|hrtime|performance.now|elapsed|duration → 0 matches. Confirms no per-beat timing anywhere; only the two ISO timestamps on Performance.\n\nRELATIONSHIPS:\nSavedRun already carries a coarse perf baseline (wall clock + voices.length per beat + producedBy mix), and the store has 5+1 runs ready to seed p50/p95 today. What's missing for a real perf baseline is per-beat timing (zero hits across tools/). What's missing for quality is structural: only confidence:number exists, no rubric slot on PatternBeat, no judge harness, and the lone 'baseline' is refactor.ts prose the engine never reads. Cleanest seams: (a) extend PerformedBeat with optional startedAt/completedAt/durationMs stamped inside runPerformance's for-loop and resolvePerformBeat; (b) extend Performance with optional quality:{judgeScore,rubricVersion,breakdown} scored post-hoc by a new tools/scores/judge.ts reading via library.ts; both safely extend detectDivergence with performance/quality axes without touching computeExecutableScoreId.",
+            "confidence": 0.9,
+            "producedBy": "maestro-assessor"
+          }
+        ],
+        "verdict": {
+          "outcome": "applied",
+          "confidence": 0.9,
+          "reason": "Mapped 19 references with bearing on baselines; identified 3 timing seams, scoreId-safety guarantee, and quality-rubric gap; relationships paragraph synthesizes what exists vs what's missing.",
+          "shouldTerminate": false
+        },
+        "stateHash": "4a196534a32a18a2d224a828e7e56d7c27600d871b709c099999e911a2abf8bb"
+      },
+      {
+        "beatIndex": 3,
+        "voices": [
+          {
+            "instrument": "question",
+            "output": "Per-claim records (claim — verdict — evidence):\n\n1. 'Per-pattern wall-clock p50/p95 baseline computable from existing SavedRuns with zero schema changes.' — FALSIFIED (partial). Performance has only run-level startedAt/completedAt (tools/symphony/types.ts:177-181); PerformedBeat has no timing (types.ts:165-170); 0 grep hits for Date.now|hrtime|elapsed|duration in tools/. Per-RUN baseline true; per-BEAT false without schema add.\n\n2. 'voices.length is engine-validated spawn-count proxy.' — CONFIRMED. validateVoiceOutputs (tools/symphony/validation.ts:40-46) hard-fails when outputs.length !== beat.voices.length; called from perform-runner.ts:136. Each PerformedVoice carries producedBy (types.ts:153-161). voices.length per beat = realized spawn count.\n\n3. 'Per-beat startedAt/completedAt requires schemaVersion bump.' — FALSIFIED. loadRun (persistence.ts:147-165) only checks schemaVersion===1 and beatIndex sequence; detectDivergence (persistence.ts:210-260) inspects beats.length/verdict/stateHash/voice prose and ignores unknown fields; JSON.parse tolerates extras. Optional startedAt?/completedAt? on PerformedBeat is additive, no bump needed.\n\n4. 'Adding optional perf/quality fields to Performance does NOT change executableScore.id.' — CONFIRMED. computeExecutableScoreId (persistence.ts:57-75) hashes only ExecutableScore plan fields {schemaVersion, frequencyMap, beats, generatedFrom, pattern?, context?}. Performance is never an input. Historical runs remain joinable.\n\n5. 'LLM non-determinism implies quality must be judged semantically, not byte-diffed.' — CONFIRMED (with nuance). PerformedVoice.output is free-form string (types.ts:156); proseDiffersAtBeat (persistence.ts:191-200) is informational only; divergence doc (persistence.ts:9-16) explicitly says 'prose drift is expected.' Nuance: MoveVerdict IS compared exactly (persistence.ts:178-189) — narrow determinism at verdict layer.\n\n6. 'MoveVerdict.confidence is a free per-beat self-rating, aggregable now.' — CONFIRMED. Required number, validated [0,1] (validation.ts:86-88), persisted on every beat. Pure reader operation — zero engine changes. Caveat: self-rating, biased/weak signal.\n\n7. 'Count of verdict==falsified in question-beat output is a cheap rigor proxy, auto-extractable from SavedRun.' — INCONCLUSIVE. The investigate pattern's question beat prescribes the {claim, verdict, evidence} shape in PROSE, but PerformedVoice.output is unstructured string — engine validates none of it. Extraction by regex is possible but fragile. Schematizing the output would lift this to CONFIRMED but requires a per-beat output schema slot.\n\n8. 'Quality regression cannot be per-PR CI gate; must be scheduled.' — INCONCLUSIVE (codebase-out-of-scope). No bench/judge harness exists; engine tests use canned Resolutions (engine.test.ts validates shape, not LLM loop). The cost/latency claim is a real-world assertion the codebase neither confirms nor denies. Policy decision, not a code fact.\n\nTALLY: CONFIRMED 2,4,5,6 | FALSIFIED 1,3 | INCONCLUSIVE 7,8.\n\nKEY EPISTEMIC GAINS:\n- Falsified #3 unlocks: per-beat timing is an additive change, NOT a migration.\n- Falsified #1 forces: full per-pattern baseline needs schema add OR has to live at run granularity initially.\n- Confirmed #4 is the foundational guarantee: any new perf/quality fields preserve scoreId — no historical SavedRun is invalidated.",
+            "confidence": 0.9,
+            "producedBy": "maestro-assessor"
+          }
+        ],
+        "verdict": {
+          "outcome": "applied",
+          "confidence": 0.9,
+          "reason": "8 claims tested with file:line evidence; 4 confirmed, 2 falsified (productively narrowing the design), 2 inconclusive with reasons.",
+          "shouldTerminate": false
+        },
+        "stateHash": "4b399e7c9dc8d26f7bba941e15ddc8cca378ccb0c9b00f7cb211de9cca905eb2"
+      },
+      {
+        "beatIndex": 4,
+        "voices": [
+          {
+            "instrument": "integrate",
+            "output": "Per-sub-question answers (table):\n\n| # | sub-question | answer | bucket | epistemic delta |\n|---|---|---|---|---|\n| 1 | SavedRun fields capturing quality vs perf | Quality: MoveVerdict.confidence (per-beat self-rating, persisted on every beat); free-form output string. Perf: NONE — no timestamps/tokens/wall-clock at beat level (Performance only has run-level startedAt/completedAt). voices.length is the only validated spawn-count proxy (validation.ts:40-46). | change | — |\n| 2 | Library/persistence support for baseline selection / historical comparison out of the box | Partial. library.ts:75-90 already indexes runs by pattern/outcome/fingerprint — sufficient for per-RUN baselines. Missing: baseline-tagging, golden-run concept, comparison API. detectDivergence (persistence.ts:170-241) compares two runs structurally but isn't wired to a baseline store. | change | — |\n| 3 | Maestro perf metrics emitted today + regression-detector hook | None emitted today. Timing seams: perform-runner.ts:128-145 (runPerformance loop) and engine.ts:421-454 (resolvePerformBeat). Aggregation/query seam: library.ts:75-90. Comparison seam: detectDivergence. | add | — |\n| 4 | Quality assessment for LLM outputs + automated baseline under non-determinism | Today: zero automated semantic judging. Output is free-form prose; drift is by design (persistence.ts:9-16,191-200). Only Verdict strings exact-compared. confidence is the only persisted quality scalar (weak, biased). Automated baseline must be semantic (LLM-judge or rubric harness), tolerate prose variance, gate on Verdict + confidence distribution + judge score. | add | — |\n| 5 | jest+tsc safety net + where baseline assertions belong | Structural only: 104 tests validate shape/types via canned Resolutions — the LLM loop never runs under test. Baselines do NOT belong in jest (non-deterministic, slow, costly). Belong in a separate harness invoked by symphony/cli.ts (scheduled), reading via scores/library.ts and writing verdicts into the store. | add | — |\n| 6 | Replay determinism — gaps for regression substrate | Replay is structurally deterministic (schemaVersion+beatIndex sequence; detectDivergence ignores unknown fields → additive perf/quality fields are back-compat). Gaps: (a) no per-beat timestamps → can't replay-with-timing; (b) prose output makes semantic divergence invisible to detectDivergence; (c) no captured model/version/RNG metadata to pin 'same conditions' replay. | change | per-beat startedAt/completedAt is additive — does NOT require schemaVersion bump (prior belief falsified) |\n| 7 | Thresholds / tolerances / alerting policy | Not configured anywhere. Only existing 'baseline' notion = refactor.ts prose context.baselineCommand — never stored, never auto-compared. No threshold config, no alerting hook, no CI gating policy. | add | per-pattern wall-clock baseline at BEAT granularity is NOT computable from existing SavedRuns (only per-RUN: 5 refactor + 1 investigate on disk) |\n| 8 | Ranked design options | Deferred to recommend beat. Constraints to carry: additive fields only (back-compat), instrument at the two timing seams, aggregate via library.ts, compare via extension of detectDivergence, semantic judging lives outside jest. | unresolved | — |\n\nSYNTHESIS:\nSymphony today persists rich structural signal (verdicts, confidence, voice counts, beat sequence) but emits ZERO perf telemetry and no semantic quality signal — confidence is the lone quality scalar and it's self-reported. Good news: the substrate is friendlier than expected — optional Performance fields don't perturb executableScore.id, detectDivergence ignores unknown fields, library.ts already supports per-RUN aggregation, so a baseline layer can be added ADDITIVELY without a schema bump. Clean seams: perform-runner.ts:128-145 + engine.ts:421-454 (timing), detectDivergence (comparison), library.ts:75-90 (query). Quality baselining is the harder half: prose drift is by design, so automated checks must be semantic (judge harness) and live outside jest. Two policy questions remain genuinely open and belong to humans not code: per-PR vs scheduled gating, and which falsified-hypothesis signal to trust before a per-beat output schema exists.",
+            "confidence": 0.9,
+            "producedBy": "maestro-assessor"
+          }
+        ],
+        "verdict": {
+          "outcome": "applied",
+          "confidence": 0.9,
+          "reason": "Each sub-question answered with bucket + epistemic delta; #8 honestly marked unresolved (deferred to recommend beat); falsified-hypothesis deltas surfaced (schema bump unnecessary; per-beat baseline not free).",
+          "shouldTerminate": false
+        },
+        "stateHash": "d4db4146e44bb957bc446f7930baa6af46a8cdbaa5cfae116c05e3b8d8c60ee0"
+      },
+      {
+        "beatIndex": 5,
+        "voices": [
+          {
+            "instrument": "order",
+            "output": "RANKED RECOMMENDATIONS (build first → build last):\n\n| # | Item | Catches | Misses | Effort | Engine vs Tooling | Follow-up | Depends on |\n|---|---|---|---|---|---|---|---|\n| 1 | Q1 — Aggregate MoveVerdict.confidence over time per beat-index (pure reader CLI over library.ts) | Slow drift in self-reported confidence; beats trending below floor | Self-report bias; one scalar dimension | S | Tooling-only | feature | — |\n| 2 | P4 — Pin baseline SavedRun per pattern (tools/scores/baselines/<pattern>.json → scoreId) | Anchor every comparison needs | nothing on its own (infra) | S | Tooling-only | feature | — |\n| 3 | P1 — `symphony bench` CLI: p50/p95 wall-clock per pattern + voices.length spawn count vs pinned baseline | Run-level perf regressions + spawn-count blowups, today, zero schema change | Per-beat hotspots | S | Tooling-only | feature | P4 |\n| 4 | I3 — Capture model/version/RNG in Performance.environment (additive field) | Apples-to-oranges comparisons; future baselines mean something | Doesn't fix old SavedRuns | S | Engine (additive, no schemaVersion bump) | feature | — |\n| 5 | I2 — tools/scores/thresholds.json keyed by pattern → bands & floors | Centralizes magic numbers P3/Q1/Q4 share | Pure config; catches nothing alone | S | Tooling-only | feature | — |\n| 6 | Q2 — Post-run voice-output invariants per pattern beat (≥1 record/sub-question; ≥N file:line refs in map; tsc/jest exit codes in verify) | Structural degradation (empty answers, missing citations, missing exit codes) | Semantic prose quality; reasoning errors that fill the schema | M | Tooling-only (validator over PerformedBeat.voices[].output) | feature | — |\n| 7 | P2 — Additive startedAt/completedAt/durationMs on PerformedBeat, stamped in runPerformance loop + resolvePerformBeat | Per-beat hotspots; enables p50/p95 per beat; unblocks meaningful P3 | Sub-beat (per-voice) timing; LLM vs orchestration split | S | Engine (additive, no schemaVersion bump) | refactor | — |\n| 8 | P3 — Extend detectDivergence with `performance` axis (±25% per beat, ±15% per run); expose via `symphony verify --baseline <id>` | Per-beat AND per-run perf regressions inline with existing divergence reporting | Quality regressions; needs honest baselines (I3) to avoid false alarms | M | Engine (consumer-side detectDivergence change) | refactor | P2, P4, I2, I3 |\n| 9 | Q3 — Schematize investigate `question` beat output into {claim, verdict, evidence}[] via optional outputSchema on pattern types | Promotes 'falsified count' from fragile regex to a real rigor metric; strengthens Q1/Q2 | Other patterns until they opt in; doesn't judge evidence quality | M | Engine (pattern types + validator hook) | refactor | Q2 (shared validator plumbing) |\n| 10 | I1 — Decide cadence: scheduled CI vs nightly vs local pre-merge (esp. for Q4) | Prevents Q4 being built in the wrong place | Nothing technical; pure decision | S | n/a | decide | — |\n| 11 | Q5 — Extend MoveVerdict with optional rubricScores:{dimension:number} for multi-dim self-rating | Replaces single weak confidence with dimensioned signal | Still self-report; rubric design is the real work | M | Engine (additive MoveVerdict field) | refactor | Q1 (consumer) |\n| 12 | Q4 — Golden-set + LLM judge: fixed (prompt,pattern) corpus, scheduled `symphony judge` CLI, verdicts written into SavedRun.quality | Semantic regressions Q1/Q2/Q3 can't see — 'the prose got dumber' | Cost; judge flake; needs honest baselines + stable env | L | Tooling-only (writes existing quality field) | feature | P4, I2, I3, I1 |\n\nONE-DAY MVP (3 items): ship Q1 → P4 → P1. Pure-reader confidence trend, pinned-baseline anchor, wall-clock + spawn-count regression CLI — all from existing data on disk, zero engine touch, no schemaVersion risk. Add I3 as a half-day stretch so tomorrow's baselines aren't poisoned the moment a model version changes.\n\nHIGH-LEVERAGE BUT ENGINE-COST UP FRONT: P2 (per-beat timing fields — unlocks every meaningful per-beat metric and all of P3) and Q3 (schematize the `question` beat — turns the investigate rigor signal from fragile regex into a first-class metric). Both are additive and back-compat (no schemaVersion bump) but do edit engine.ts/perform-runner.ts/pattern types.",
+            "confidence": 0.9,
+            "producedBy": "maestro-assessor"
+          }
+        ],
+        "verdict": {
+          "outcome": "applied",
+          "confidence": 0.9,
+          "reason": "12 items ranked with effort/engine-cost/dependency/follow-up tagging; explicit 3-item MVP and 2-item high-leverage call-out; honors falsified findings (no schemaVersion bump needed for additive fields).",
+          "shouldTerminate": false
+        },
+        "stateHash": "04381d3d9748a1c03a3b744fada9f4214fe28293c853502ab6b52ed79fac5bd7"
+      }
+    ],
+    "startedAt": "2026-05-08T22:23:11.724Z",
+    "completedAt": "2026-05-08T22:33:20.459Z",
+    "outcome": "success"
+  },
+  "problemFingerprint": "94d77890f894074150e0f0999ea14d5d2a738e7f478821ec224c9a9ea121449e",
+  "timestamp": "2026-05-08T22:23:11.723Z"
+}

@@ -1,0 +1,11 @@
+{
+  "patternName": "feature",
+  "sourceFile": "tools/scores/fixtures/feature.json",
+  "capturedAt": "2026-05-08T23:33:03.051Z",
+  "metrics": {
+    "beatCount": 7,
+    "spawnCount": 7,
+    "wallMs": 574967,
+    "meanConfidence": 0.95
+  }
+}

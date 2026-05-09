@@ -20,7 +20,7 @@ The repo ships three Patterns (patterns):
 - **`refactor`** — restructure code without changing behavior
 - **`investigate`** — answer a question about the codebase
 
-Each Pattern is just a list of beats in a specific order. For example, refactor's beats are: `frame → survey → capture → plan → execute → verify → prune`. Each beat has a directive (what to do) and a tag for what kind of work it is (read-only analysis vs. file edit vs. decision).
+Each Pattern is just a list of beats in a specific order. For example, refactor's beats are: `frame → survey → plan → execute → verify → prune`. Each beat has a directive (what to do) and a tag for what kind of work it is (read-only analysis vs. file edit vs. decision).
 
 These Patterns were _pre-debated_ — humans argued about the right beat sequence once, saved it, and now every refactor follows the same proven script. You don't re-derive the playbook every time.
 
@@ -54,3 +54,46 @@ Imagine a chat agent doing the same refactor. It reads your prompt, picks an app
 **The core shift:** in a chat, the AI's instructions are _suggestions it may follow loosely_. In Maestro, the same instructions are _rules the engine enforces_. The AI is only trusted with the parts that genuinely need judgment ("does this Pattern fit?", "did this beat achieve its directive?") — the _order_, the _gates_, and the _shape of the work_ are owned by code, not by the model.
 
 A skill tells the AI what _should_ happen. Symphony refuses to continue when it doesn't.
+
+## Contributing
+
+### Prerequisites
+
+- Node.js 20.x
+- npm (the repo uses `package-lock.json` for CI installs via `npm ci`; `yarn.lock` is also present for legacy reasons but npm is canonical)
+
+### Setup
+
+```sh
+npm install
+```
+
+The `prepare` script installs Husky's git hooks on first install.
+
+### Local checks
+
+These three commands are the contract — CI and the `pre-push` hook run the same set:
+
+```sh
+npm run lint        # oxlint
+npm run typecheck   # tsc -p tools/tsconfig.typecheck.json
+npm test            # jest --config tools/jest.config.js
+```
+
+### Pre-push hook
+
+`.husky/pre-push` runs `lint`, `typecheck`, and `test` before any `git push`.
+To bypass in an emergency: `git push --no-verify` (discouraged — CI will still fail).
+
+### CI
+
+GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `main` and
+every pull request targeting `main`, executing the same three commands on
+Node 20. A green local run should imply a green CI run.
+
+### Baselines
+
+Performance baselines under `tools/scores/baselines/` gate the non-regression
+suite. When a pattern's beat sequence changes, the corresponding baseline must
+be refreshed from a fresh SavedRun. See
+[tools/scores/baselines/README.md](tools/scores/baselines/README.md).

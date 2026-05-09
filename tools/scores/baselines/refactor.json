@@ -1,0 +1,11 @@
+{
+  "patternName": "refactor",
+  "sourceFile": "tools/scores/fixtures/refactor.json",
+  "capturedAt": "2026-05-08T23:03:49.701Z",
+  "metrics": {
+    "beatCount": 6,
+    "spawnCount": 6,
+    "wallMs": 931699,
+    "meanConfidence": 0.92
+  }
+}
