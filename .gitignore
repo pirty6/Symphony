@@ -2,3 +2,4 @@ node_modules
 dist
 tools/lib
 tools/scores/store
+tools/scores/index.json

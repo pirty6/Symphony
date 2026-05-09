@@ -148,12 +148,12 @@ with a different `--pattern`.
 First pause when starting with `--pattern new`. Pick the lowest tier
 that covers the risk:
 
-| Complexity | Sub-agents during draft           |
-| ---------- | --------------------------------- |
-| 1          | proposer alone                    |
-| 2          | proposer + skeptic                |
-| 3          | proposer + skeptic + pragmatist   |
-| 4          | all four (adds template-critic)   |
+| Complexity | Sub-agents during draft         |
+| ---------- | ------------------------------- |
+| 1          | proposer alone                  |
+| 2          | proposer + skeptic              |
+| 3          | proposer + skeptic + pragmatist |
+| 4          | all four (adds template-critic) |
 
 > `{ "kind": "classify-complexity", "pauseId": "<echo>", "complexity": 1|2|3|4 }`
 
@@ -232,7 +232,12 @@ critical failure).
 >   "voiceOutputs": [
 >     { "instrument": "...", "output": "...", "confidence": 0.9, "producedBy": "maestro-assessor" }
 >   ],
->   "verdict": { "outcome": "applied", "confidence": 0.9, "reason": "...", "shouldTerminate": false }
+>   "verdict": {
+>     "outcome": "applied",
+>     "confidence": 0.9,
+>     "reason": "...",
+>     "shouldTerminate": false
+>   }
 > }
 > ```
 
@@ -297,6 +302,7 @@ about pattern shape go through `confirm-fit` reroute or draft-pattern
   call advanced, read the state file and check `pause.pauseId`. Never
   re-issue with a stale id (loud fail) or the just-copied id (silent
   double-advance). Always derive from current on-disk state.
+- **Using `refactor` or `feature` for a bug fix instead of the dedicated `fix` pattern.** Bug repair has its own pattern with a mandatory failing-test reproduction step; routing it through equivalence-preserving (`refactor`) or contract-driven (`feature`) work loses that gate.
 
 ---
 
