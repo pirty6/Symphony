@@ -8,6 +8,7 @@
  */
 
 import type { Pattern, PatternScore } from "./types";
+import { LINT_BEAT } from "./shared";
 
 const score: PatternScore = {
   pattern: "refactor",
@@ -28,18 +29,11 @@ const score: PatternScore = {
         "Survey blast radius — enumerate every reference. Distinguish symbol-level (imports, calls, type usages — AST/LSP) from string-level (docs, comments, configs, serialized data, log queries — only grep + human reading finds these). Renames and splits fail silently when string-level surveys are skipped.",
     },
     {
-      step: "capture",
-      level: 1,
-      instrument: "order",
-      directive:
-        "Capture baseline — run tests, types, and build BEFORE any edit on the surface this refactor touches. Record the green state. context.baselineCommand may pin the exact command. If red on the touched surface, halt.",
-    },
-    {
       step: "plan",
       level: 3,
       instrument: "order",
       directive:
-        "Plan move — describe the sequence of mechanical edits in order (introduce new name → update call sites → relocate → delete shim) and mark reversible checkpoints between them. For merge/consolidate, prove behavioral equivalence first.",
+        "Plan move — first capture baseline by running tests, types, and build on the surface this refactor touches; halt if red on the touched surface (context.baselineCommand may pin the exact command). Then describe the sequence of mechanical edits in order (introduce new name → update call sites → relocate → delete shim) and mark reversible checkpoints between them. For merge/consolidate, prove behavioral equivalence first.",
     },
     {
       step: "execute",
@@ -55,6 +49,7 @@ const score: PatternScore = {
       directive:
         "Verify equivalence — re-run the baseline commands covering the survey surface from beat 'survey'. Integration tests outside the default run may need to be triggered explicitly.",
     },
+    LINT_BEAT,
     {
       step: "prune",
       level: 2,

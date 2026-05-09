@@ -7,7 +7,6 @@
  * direct what the agent must DO and the reply shape.
  */
 
-import type { Pattern } from "../patterns/types";
 import type { Beat } from "../symphony/types";
 import { MAESTRO_DRAFT_MAX_ROUNDS, MAESTRO_GO_PHRASES } from "./engine";
 import type { Pause } from "./types/pause";
@@ -22,7 +21,11 @@ export function composerPromptFor(pause: Pause): string {
     case "classify-complexity":
       return classifyComposer();
     case "draft-pattern-round":
-      return draftComposer(pause.payload.round, pause.payload.complexity, pause.payload.priorDraft !== undefined);
+      return draftComposer(
+        pause.payload.round,
+        pause.payload.complexity,
+        pause.payload.priorDraft !== undefined,
+      );
     case "elicit-context":
       return elicitComposer(pause.payload.missingKeys);
     case "go-gate":
@@ -65,9 +68,15 @@ function classifyComposer(): string {
 
 function draftComposer(round: number, complexity: Complexity, hasPriorDraft: boolean): string {
   const agents = ["proposer"];
-  if (complexity >= 2) agents.push("skeptic");
-  if (complexity >= 3) agents.push("pragmatist");
-  if (complexity >= 4) agents.push("template-critic");
+  if (complexity >= 2) {
+    agents.push("skeptic");
+  }
+  if (complexity >= 3) {
+    agents.push("pragmatist");
+  }
+  if (complexity >= 4) {
+    agents.push("template-critic");
+  }
   return [
     `Draft round ${round}/${MAESTRO_DRAFT_MAX_ROUNDS}, complexity ${complexity}. Spawn: ${agents.join(", ")}.`,
     hasPriorDraft ? "Iterate on priorDraft (in payload)." : "Propose from scratch.",
@@ -88,12 +97,29 @@ function goGateComposer(): string {
   return `Ask user for explicit go. Accepted (case-insensitive): ${MAESTRO_GO_PHRASES.join(", ")}. Vague positives ('yeah', 'fine-ish') rejected.\nReply: { kind: 'go-gate', phrase: '<user phrase>' }`;
 }
 
+// Per-instrument budget guidance. Soft defaults surfaced at perform-beat
+// time; not enforced by the engine. Unknown instruments produce no line.
+const INSTRUMENT_BUDGETS: Record<string, string> = {
+  analyze: "Budget guidance: ≤ 8 file reads, ≤ 3 grep calls (soft default, not a hard limit).",
+  order: "Budget guidance: ≤ 5 file edits per beat (soft default, not a hard limit).",
+  integrate: "Budget guidance: ≤ 25k tokens of evidence cited (soft default, not a hard limit).",
+  question: "Budget guidance: ≤ 6 sub-agent or tool calls (soft default, not a hard limit).",
+  decide: "Budget guidance: ≤ 6 sub-agent or tool calls (soft default, not a hard limit).",
+};
+
 function performComposer(beatIndex: number, beat: Beat): string {
-  return [
+  const lines = [
     `Beat ${beatIndex} (L${beat.level}, ${beat.voices.map((v) => v.instrument).join("+")}): ${beat.directive}`,
     "Read-only → spawn maestro-assessor. Mutating → spawn maestro-executor.",
     "Reply: { kind: 'perform-beat', voiceOutputs: [...], verdict: {...} }",
     "Voice: { instrument, output, confidence: [0,1], producedBy: 'maestro-assessor'|'maestro-executor' }.",
     "Verdict: { outcome: 'applied'|'failed'|'skipped', confidence, reason, shouldTerminate }.",
-  ].join("\n");
+  ];
+  for (const v of beat.voices) {
+    const hint = INSTRUMENT_BUDGETS[v.instrument];
+    if (hint) {
+      lines.push(`${v.instrument}: ${hint}`);
+    }
+  }
+  return lines.join("\n");
 }

@@ -26,18 +26,11 @@ const score: PatternScore = {
         "Scope inventory — enumerate the items, files, or behaviors in bounds and explicitly mark what is out. Repo-specific scope qualifiers come from context.scope when present.",
     },
     {
-      step: "locate",
-      level: 2,
-      instrument: "analyze",
-      directive:
-        "Locate references — use LSP go-to-references as the primary signal; grep is a supplement for the cases LSP misses (string keys, serialization, dynamic dispatch, runtime config, type-only usages). Output a deduplicated list of `file:line` references, each tagged by how it was found (LSP / grep / dynamic). Repo-specific locate hints come from context.locateHints when present.",
-    },
-    {
-      step: "trace",
+      step: "map",
       level: 3,
       instrument: "analyze",
       directive:
-        "For each reference from `locate`, capture what the code actually does (not what its name suggests) and how it relates to the other in-scope items. One entry per reference, plus a short relationships paragraph.",
+        "Map references — use LSP go-to-references as the primary signal; grep is a supplement for the cases LSP misses (string keys, serialization, dynamic dispatch, runtime config, type-only usages). Output a deduplicated list of `file:line` references, each tagged by how it was found (LSP / grep / dynamic). For each reference, capture what the code actually does (not what its name suggests) and how it relates to the other in-scope items — one entry per reference. Close with a short relationships paragraph. Repo-specific locate hints come from context.locateHints when present.",
     },
     {
       step: "hypothesize",

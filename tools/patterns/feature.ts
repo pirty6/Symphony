@@ -7,6 +7,7 @@
  */
 
 import type { Pattern, PatternScore } from "./types";
+import { LINT_BEAT } from "./shared";
 
 const score: PatternScore = {
   pattern: "feature",
@@ -17,14 +18,7 @@ const score: PatternScore = {
       level: 4,
       instrument: "analyze",
       directive:
-        "Frame the feature — restate scope (context.scope), contract (context.contract), and any knownEdges. Confirm the boundary is concrete enough for the survey to start.",
-    },
-    {
-      step: "survey",
-      level: 3,
-      instrument: "question",
-      directive:
-        "Survey neighbors — locate the modules, types, and conventions the feature will touch.",
+        "Frame the feature and survey neighbors — restate scope (context.scope), contract (context.contract), and any knownEdges; confirm the boundary is concrete enough to start. Then locate the modules, types, and conventions the feature will touch.",
     },
     {
       step: "test",
@@ -60,6 +54,7 @@ const score: PatternScore = {
       directive:
         "Verify integration — run the full suite and confirm the feature composes with existing code.",
     },
+    LINT_BEAT,
   ],
 };
 
