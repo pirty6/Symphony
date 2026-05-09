@@ -28,9 +28,14 @@ Each baseline records the four metrics computed by `runMetrics` in `tools/scores
 
 Hand-edit is intentional — baselines are a deliberate "this run is the floor", not a moving average.
 
-## Skipped patterns
+## CI behavior
 
-If `metrics` is `null`, the non-regression test skips that pattern with a reason in the test message. `feature` is currently skipped because `tools/scores/store/feature/` is empty — refresh after the first feature run lands.
+Two describe blocks back the baselines:
+
+- `baseline-validity` — always runs in CI. Validates each baseline JSON's shape (`patternName`, `sourceFile`, `capturedAt`, `metrics` fields well-formed; `metrics === null` permitted). This is the unconditional gate that catches malformed baseline edits.
+- `non-regression` — runs only when a local SavedRun exists under `tools/scores/store/<pattern>/`. The `store/` directory is gitignored, so on CI (and on fresh clones) this block skips per-pattern with a message naming the absent store path. Run the pattern locally through maestro to populate the store and exercise the four-gate comparison.
+
+If `metrics` is `null` in a baseline JSON, the non-regression test for that pattern also skips with a reason — refresh per the workflow below.
 
 ## Beat-count changes require a baseline refresh
 
