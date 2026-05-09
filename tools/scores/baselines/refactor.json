@@ -1,6 +1,6 @@
 {
   "patternName": "refactor",
-  "sourceFile": "tools/scores/store/refactor/68467e7a4ba0ef15-2026-05-08T23-03-49-701Z.json",
+  "sourceFile": "tools/scores/fixtures/refactor.json",
   "capturedAt": "2026-05-08T23:03:49.701Z",
   "metrics": {
     "beatCount": 6,

@@ -2,7 +2,6 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import {
   compareToBaseline,
-  latestRunFile,
   loadSavedRun,
   runMetrics,
   type RunMetrics,
@@ -200,22 +199,16 @@ describe("non-regression", () => {
   for (const pattern of patterns) {
     const baselinePath = path.resolve(__dirname, "baselines", `${pattern}.json`);
     const baseline: BaselineFile = JSON.parse(fs.readFileSync(baselinePath, "utf8"));
+    const fixturePath = path.resolve(__dirname, "fixtures", `${pattern}.json`);
 
     if (baseline.metrics === null) {
       it.skip(`${pattern}: baseline has no metrics (empty store) - refresh per baselines/README.md`, () => {});
       continue;
     }
 
-    const file = latestRunFile(pattern);
-    if (file === undefined) {
-      it.skip(`${pattern}: no local SavedRun under tools/scores/store/${pattern}/ - run the pattern locally to populate (CI gate is baseline-validity)`, () => {});
-      continue;
-    }
-
     const baselineMetrics = baseline.metrics;
-    const savedRunFile = file;
-    it(`${pattern}: latest SavedRun beats all four baseline gates`, () => {
-      const current = runMetrics(loadSavedRun(savedRunFile));
+    it(`${pattern}: fixture SavedRun matches baseline gates`, () => {
+      const current = runMetrics(loadSavedRun(fixturePath));
       const cmp = compareToBaseline(current, baselineMetrics);
       expect(cmp.failures).toEqual([]);
       expect(cmp.ok).toBe(true);

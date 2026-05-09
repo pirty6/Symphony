@@ -20,32 +20,47 @@ Each baseline records the four metrics computed by `runMetrics` in `tools/scores
 3. `current.wallMs     >  baseline.wallMs * 1.25` — > 25% slowdown (only when both defined)
 4. `current.meanConfidence < baseline.meanConfidence − 0.1` — major confidence drop
 
+## Three layers, one chain
+
+The non-regression gate is built from three committed artifacts that move together:
+
+| Layer | Path | Status | Role |
+| --- | --- | --- | --- |
+| Live runs | `tools/scores/store/<pattern>/*.json` | gitignored, local-only | Every maestro run lands here. Source of truth for picking a new fixture. |
+| Fixtures | `tools/scores/fixtures/<pattern>.json` | committed | One frozen SavedRun per pattern. The test runs `runMetrics` against this exact file on every machine. |
+| Baselines | `tools/scores/baselines/<pattern>.json` | committed | The pinned floor for the four metrics. `sourceFile` points at the fixture. |
+
+Initially the baseline is computed from the fixture, so the gate compares the fixture to itself — any drift in metric-extraction logic (`runMetrics`) goes red immediately.
+
 ## Refreshing a baseline (manual)
 
-1. Pick the SavedRun to anchor against — typically the newest green run for the pattern under `tools/scores/store/<pattern>/`. Filenames sort lexicographically by ISO timestamp; descending sort yields newest first.
-2. Compute the four metrics. Either use `runMetrics` from `metrics.ts` in a one-shot script, or compute by hand from the JSON.
-3. Update the pattern's baseline JSON: paste the new `sourceFile`, `capturedAt`, and `metrics` block. Commit.
+1. Run the pattern through maestro. A new SavedRun lands under `tools/scores/store/<pattern>/`.
+2. Pick the SavedRun to anchor against (typically the newest green run; filenames sort lexicographically by ISO timestamp).
+3. Copy it over the fixture: `cp tools/scores/store/<pattern>/<id>.json tools/scores/fixtures/<pattern>.json`. Do not reformat — the test reads it as bytes-on-disk and any mutation can change metrics.
+4. Recompute the four metrics from the new fixture (use `runMetrics` from `metrics.ts` or compute by hand).
+5. Update the pattern's baseline JSON: `sourceFile` to `tools/scores/fixtures/<pattern>.json`, fresh `capturedAt`, fresh `metrics` block.
+6. Commit fixture + baseline together.
 
 Hand-edit is intentional — baselines are a deliberate "this run is the floor", not a moving average.
 
 ## CI behavior
 
-Two describe blocks back the baselines:
+Two describe blocks back the baselines, both unconditional:
 
-- `baseline-validity` — always runs in CI. Validates each baseline JSON's shape (`patternName`, `sourceFile`, `capturedAt`, `metrics` fields well-formed; `metrics === null` permitted). This is the unconditional gate that catches malformed baseline edits.
-- `non-regression` — runs only when a local SavedRun exists under `tools/scores/store/<pattern>/`. The `store/` directory is gitignored, so on CI (and on fresh clones) this block skips per-pattern with a message naming the absent store path. Run the pattern locally through maestro to populate the store and exercise the four-gate comparison.
+- `baseline-validity` — validates each baseline JSON's shape (`patternName`, `sourceFile`, `capturedAt`, `metrics` fields well-formed; `metrics === null` permitted). Catches malformed baseline edits.
+- `non-regression` — loads `tools/scores/fixtures/<pattern>.json`, runs `runMetrics` on it, and compares against the baseline. Same fixture → same metrics → same result on every machine. No skips, no dependency on local `store/` contents.
 
-If `metrics` is `null` in a baseline JSON, the non-regression test for that pattern also skips with a reason — refresh per the workflow below.
+If a baseline's `metrics` is `null`, the non-regression test for that pattern skips with a reason — refresh per the workflow above.
 
 ## Beat-count changes require a baseline refresh
 
-Adding or removing a beat in a pattern definition (`tools/patterns/<name>.ts`) raises or lowers the `beatCount`/`spawnCount` floors in this baseline. The `beatCount` gate above will go red on the next captured run if the pattern is changed without refreshing the corresponding baseline JSON in the same change. The reverse is also true: bumping a baseline floor without a matching captured SavedRun under `tools/scores/store/<pattern>/` will make the non-regression test red until a fresh run lands.
+Adding or removing a beat in a pattern definition (`tools/patterns/<name>.ts`) raises or lowers the `beatCount`/`spawnCount` floors in this baseline. The `beatCount` gate above will go red on the next captured run if the pattern is changed without refreshing the corresponding fixture + baseline JSON in the same change.
 
 Workflow:
 
 1. Make the pattern change.
 2. Capture a fresh SavedRun by running the pattern through maestro on a small target.
-3. Refresh the baseline JSON in the same commit.
+3. Refresh the fixture and baseline JSON in the same commit.
 
 ## LINT_BEAT enforces oxlint clean
 

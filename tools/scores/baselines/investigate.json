@@ -1,6 +1,6 @@
 {
   "patternName": "investigate",
-  "sourceFile": "tools/scores/store/investigate/94d77890f8940741-2026-05-08T22-23-11-723Z.json",
+  "sourceFile": "tools/scores/fixtures/investigate.json",
   "capturedAt": "2026-05-08T22:23:11.724Z",
   "metrics": {
     "beatCount": 6,
