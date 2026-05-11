@@ -97,3 +97,60 @@ Performance baselines under `tools/scores/baselines/` gate the non-regression
 suite. When a pattern's beat sequence changes, the corresponding baseline must
 be refreshed from a fresh SavedRun. See
 [tools/scores/baselines/README.md](tools/scores/baselines/README.md).
+
+## Using Maestro in your VS Code workspaces
+
+Maestro runs as a VS Code Copilot Chat agent. The agent definitions live in `.github/agents/` inside this repo. VS Code automatically discovers `.agent.md` files in that directory and registers them as chat participants, so the setup is: clone Symphony once, then link its agents into every workspace where you want Maestro available.
+
+### One-time setup
+
+1. **Clone Symphony** somewhere permanent on your machine:
+
+   ```sh
+   git clone https://github.com/<org>/Symphony.git ~/Symphony
+   cd ~/Symphony && npm install
+   ```
+
+2. **Update the absolute path in `maestro.agent.md`.** Open `.github/agents/maestro.agent.md` and change the `SYMPHONY=` line to match where you cloned the repo:
+
+   ```sh
+   SYMPHONY=/Users/<you>/Symphony
+   ```
+
+   Every CLI invocation in the agent file uses this path, so it must be correct. Do the same for any hardcoded paths in the file (the `npx tsx ...` commands).
+
+### Per-workspace setup
+
+For each VS Code workspace where you want to use Maestro, symlink the agents directory:
+
+```sh
+cd /path/to/your-project
+mkdir -p .github
+ln -s ~/Symphony/.github/agents .github/agents
+```
+
+This creates a symlink so VS Code discovers the agent files without duplicating them. When you update Symphony (e.g. `git pull`), every workspace picks up the changes automatically.
+
+> **Tip:** If you prefer not to commit the symlink to your project's repo, add `.github/agents` to your project's `.gitignore`.
+
+### Using Maestro
+
+Once the agents are linked, open VS Code Copilot Chat and switch to **maestro** mode (click the mode selector at the top of the chat panel). Then just describe your task:
+
+- _"refactor the auth module to use dependency injection"_
+- _"add a rate-limiting middleware to the API"_
+- _"investigate why the tests flake on CI"_
+
+Maestro will:
+
+1. Pick a pattern (`feature`, `refactor`, `investigate`, or `fix`) — or draft a new one.
+2. Ask you to confirm the fit and fill in required context.
+3. Present a go-gate for explicit approval.
+4. Execute beat-by-beat, spawning read-only assessors and write-only executors.
+5. Save a `Performance` JSON artifact you can audit.
+
+### Requirements
+
+- **VS Code** with GitHub Copilot Chat (agent mode must be enabled).
+- **Node.js 20+** — Symphony's CLIs run via `npx tsx`, which needs Node and the installed dependencies in the Symphony clone.
+- The Symphony repo must have its dependencies installed (`npm install`).
