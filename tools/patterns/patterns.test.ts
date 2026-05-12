@@ -33,6 +33,7 @@ describe("PatternLibrary", () => {
       "reproduce",
       "diagnose",
       "fix",
+      "cover",
       "regress",
       "lint",
     ]);
