@@ -25,7 +25,7 @@ const score: PatternScore = {
       level: 4,
       instrument: "analyze",
       directive:
-        "Diagnose the minimal cause — narrow to the specific code path responsible for the failing test. Scope is \"where does this bug come from\", not investigate's broad \"how does this system work\"; stop at the smallest surface that explains the failure.",
+        'Diagnose the minimal cause — narrow to the specific code path responsible for the failing test. Scope is "where does this bug come from", not investigate\'s broad "how does this system work"; stop at the smallest surface that explains the failure.',
     },
     {
       step: "fix",
