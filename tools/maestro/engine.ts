@@ -315,7 +315,9 @@ export function advance(
   const events: MaestroEvent[] = [];
 
   if (pause.kind !== resolution.kind) {
-    const next = failed(`resolution kind '${resolution.kind}' does not match pause '${pause.kind}'`);
+    const next = failed(
+      `resolution kind '${resolution.kind}' does not match pause '${pause.kind}'`,
+    );
     appendTerminalEvents(next, events);
     return withEvents(next, events);
   }
@@ -325,7 +327,9 @@ export function advance(
   // a stale resolution from a prior turn) is rejected here, not
   // silently accepted as a fresh transition.
   if (typeof resolution.pauseId !== "string" || resolution.pauseId === "") {
-    const next = failed(`${pause.kind}: resolution.pauseId is required (expected '${pause.pauseId}')`);
+    const next = failed(
+      `${pause.kind}: resolution.pauseId is required (expected '${pause.pauseId}')`,
+    );
     appendTerminalEvents(next, events);
     return withEvents(next, events);
   }
@@ -356,7 +360,14 @@ export function advance(
       next = resolveGoGate(internal, resolution as GoRes, clock, newPauseId, events);
       break;
     case "perform-beat":
-      next = resolvePerformBeat(internal, resolution as PerformRes, pause, clock, newPauseId, events);
+      next = resolvePerformBeat(
+        internal,
+        resolution as PerformRes,
+        pause,
+        clock,
+        newPauseId,
+        events,
+      );
       break;
   }
   appendTerminalEvents(next, events);
