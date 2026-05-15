@@ -4,70 +4,89 @@
    ════════════════════════════════════════════════════════════════════ */
 
 // ─── DOM References ────────────────────────────────────────────────
-const $dropZone    = document.getElementById("drop-zone");
-const $dropArea    = document.getElementById("drop-area");
-const $fileInput   = document.getElementById("file-input");
-const $pasteInput  = document.getElementById("paste-input");
-const $pasteBtn    = document.getElementById("paste-btn");
-const $viewer      = document.getElementById("viewer");
-const $backBtn     = document.getElementById("back-btn");
+const $dropZone = document.getElementById("drop-zone");
+const $dropArea = document.getElementById("drop-area");
+const $fileInput = document.getElementById("file-input");
+const $pasteInput = document.getElementById("paste-input");
+const $pasteBtn = document.getElementById("paste-btn");
+const $viewer = document.getElementById("viewer");
+const $backBtn = document.getElementById("back-btn");
 const $statusBadge = document.getElementById("status-badge");
-const $pattern     = document.getElementById("header-pattern");
-const $prompt      = document.getElementById("header-prompt");
-const $timing      = document.getElementById("header-timing");
-const $stepper     = document.getElementById("phase-stepper");
-const $leftPanel   = document.getElementById("left-panel");
-const $rightPanel  = document.getElementById("right-panel");
+const $pattern = document.getElementById("header-pattern");
+const $prompt = document.getElementById("header-prompt");
+const $timing = document.getElementById("header-timing");
+const $stepper = document.getElementById("phase-stepper");
+const $leftPanel = document.getElementById("left-panel");
+const $rightPanel = document.getElementById("right-panel");
 const $watchToggle = document.getElementById("watch-toggle");
-const $exportBtn   = document.getElementById("export-btn");
-const $toast       = document.getElementById("toast");
+const $exportBtn = document.getElementById("export-btn");
+const $toast = document.getElementById("toast");
 const $promptBanner = document.getElementById("prompt-banner");
 
-const $library       = document.getElementById("library");
-const $libraryList   = document.getElementById("library-list");
+const $library = document.getElementById("library");
+const $libraryList = document.getElementById("library-list");
 const $librarySearch = document.getElementById("library-search");
 
-let currentData  = undefined;
-let currentType  = undefined; // "engine-state" | "executable-score" | "saved-run"
-let fileHandle   = undefined;
-let watchTimer   = undefined;
-let manifest     = [];
+let currentData = undefined;
+let currentType = undefined; // "engine-state" | "executable-score" | "saved-run"
+let fileHandle = undefined;
+let watchTimer = undefined;
+let manifest = [];
 
 // ─── File Type Detection ───────────────────────────────────────────
 function detectFileType(data) {
-  if (!data || typeof data !== "object") {return undefined;}
+  if (!data || typeof data !== "object") {
+    return undefined;
+  }
   // SavedRun: has patternScore + executableScore + performance
-  if (data.patternScore && data.executableScore && data.performance) {return "saved-run";}
+  if (data.patternScore && data.executableScore && data.performance) {
+    return "saved-run";
+  }
   // ExecutableScore: has schemaVersion + id + frequencyMap + beats array
-  if (data.schemaVersion && data.id && data.frequencyMap && Array.isArray(data.beats)) {return "executable-score";}
+  if (data.schemaVersion && data.id && data.frequencyMap && Array.isArray(data.beats)) {
+    return "executable-score";
+  }
   // Engine state: has kind field (running | done | planned | failed)
-  if (data.kind && ["running", "done", "planned", "failed"].includes(data.kind)) {return "engine-state";}
+  if (data.kind && ["running", "done", "planned", "failed"].includes(data.kind)) {
+    return "engine-state";
+  }
   return undefined;
 }
 
 // ─── File Loading ──────────────────────────────────────────────────
 $dropArea.addEventListener("click", () => $fileInput.click());
 $dropArea.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $fileInput.click(); }
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    $fileInput.click();
+  }
 });
 
 $dropArea.addEventListener("dragover", (e) => {
-  e.preventDefault(); $dropArea.classList.add("drag-over");
+  e.preventDefault();
+  $dropArea.classList.add("drag-over");
 });
 $dropArea.addEventListener("dragleave", () => $dropArea.classList.remove("drag-over"));
 $dropArea.addEventListener("drop", (e) => {
-  e.preventDefault(); $dropArea.classList.remove("drag-over");
+  e.preventDefault();
+  $dropArea.classList.remove("drag-over");
   const file = e.dataTransfer.files[0];
-  if (file) {readFile(file);}
+  if (file) {
+    readFile(file);
+  }
 });
 
 $fileInput.addEventListener("change", () => {
-  if ($fileInput.files[0]) {readFile($fileInput.files[0]);}
+  if ($fileInput.files[0]) {
+    readFile($fileInput.files[0]);
+  }
 });
 
 $pasteBtn.addEventListener("click", () => {
   const text = $pasteInput.value.trim();
-  if (!text) {return;}
+  if (!text) {
+    return;
+  }
   try {
     const data = JSON.parse(text);
     loadData(data);
@@ -117,7 +136,9 @@ async function startWatching() {
         const text = await file.text();
         const data = JSON.parse(text);
         loadData(data, true);
-      } catch (_) { /* ignore transient read errors */ }
+      } catch (_) {
+        /* ignore transient read errors */
+      }
     }, 2000);
   } catch (_) {
     $watchToggle.checked = false;
@@ -125,7 +146,10 @@ async function startWatching() {
 }
 
 function stopWatching() {
-  if (watchTimer) { clearInterval(watchTimer); watchTimer = undefined; }
+  if (watchTimer) {
+    clearInterval(watchTimer);
+    watchTimer = undefined;
+  }
 }
 
 // ─── Navigation ────────────────────────────────────────────────────
@@ -140,14 +164,20 @@ $backBtn.addEventListener("click", () => {
 
 $prompt.addEventListener("click", () => $prompt.classList.toggle("expanded"));
 $prompt.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $prompt.classList.toggle("expanded"); }
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    $prompt.classList.toggle("expanded");
+  }
 });
 
 // ─── Export ────────────────────────────────────────────────────────
 $exportBtn.addEventListener("click", () => {
-  if (!currentData) {return;}
+  if (!currentData) {
+    return;
+  }
   const summary = buildExportSummary(currentData, currentType);
-  navigator.clipboard.writeText(JSON.stringify(summary, undefined, 2))
+  navigator.clipboard
+    .writeText(JSON.stringify(summary, undefined, 2))
     .then(() => showToast("Copied to clipboard"))
     .catch(() => showToast("Copy failed"));
 });
@@ -171,9 +201,9 @@ function buildExportSummary(data, type) {
       pattern: data.executableScore?.pattern ?? data.patternScore?.pattern,
       outcome: p.outcome,
       totalBeats: p.beats.length,
-      applied: p.beats.filter(b => b.verdict?.outcome === "applied").length,
-      skipped: p.beats.filter(b => b.verdict?.outcome === "skipped").length,
-      failed: p.beats.filter(b => b.verdict?.outcome === "failed").length,
+      applied: p.beats.filter((b) => b.verdict?.outcome === "applied").length,
+      skipped: p.beats.filter((b) => b.verdict?.outcome === "skipped").length,
+      failed: p.beats.filter((b) => b.verdict?.outcome === "failed").length,
       startedAt: p.startedAt,
       completedAt: p.completedAt,
     };
@@ -192,9 +222,9 @@ function buildExportSummary(data, type) {
     const p = data.result.performance;
     s.outcome = p.outcome;
     s.totalBeats = p.beats.length;
-    s.applied = p.beats.filter(b => b.verdict?.outcome === "applied").length;
-    s.skipped = p.beats.filter(b => b.verdict?.outcome === "skipped").length;
-    s.failed = p.beats.filter(b => b.verdict?.outcome === "failed").length;
+    s.applied = p.beats.filter((b) => b.verdict?.outcome === "applied").length;
+    s.skipped = p.beats.filter((b) => b.verdict?.outcome === "skipped").length;
+    s.failed = p.beats.filter((b) => b.verdict?.outcome === "failed").length;
     s.startedAt = p.startedAt;
     s.completedAt = p.completedAt;
   } else if (data.kind === "failed") {
@@ -218,39 +248,63 @@ function esc(str) {
 }
 
 function truncate(str, len) {
-  if (!str) {return "";}
+  if (!str) {
+    return "";
+  }
   return str.length > len ? str.slice(0, len) + "…" : str;
 }
 
 function formatTime(iso) {
-  if (!iso) {return "—";}
+  if (!iso) {
+    return "—";
+  }
   try {
     const d = new Date(iso);
     return d.toLocaleString();
-  } catch { return iso; }
+  } catch {
+    return iso;
+  }
 }
 
 function friendlyDate(iso) {
-  if (!iso) {return "";}
+  if (!iso) {
+    return "";
+  }
   try {
     const d = new Date(iso);
-    if (isNaN(d.getTime())) {return iso;}
-    return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
-  } catch { return iso; }
+    if (isNaN(d.getTime())) {
+      return iso;
+    }
+    return d.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return iso;
+  }
 }
 
 function elapsed(startIso, endIso) {
-  if (!startIso) {return "";}
+  if (!startIso) {
+    return "";
+  }
   const start = new Date(startIso).getTime();
   const end = endIso ? new Date(endIso).getTime() : Date.now();
   const sec = Math.floor((end - start) / 1000);
-  if (sec < 60) {return sec + "s";}
+  if (sec < 60) {
+    return sec + "s";
+  }
   const min = Math.floor(sec / 60);
   return min + "m " + (sec % 60) + "s";
 }
 
 function field(label, value) {
-  if (value === undefined || value === undefined) {return "";}
+  if (value === undefined || value === undefined) {
+    return "";
+  }
   return `<div class="payload-field">
     <div class="payload-label">${esc(label)}</div>
     <div class="payload-value">${esc(String(value))}</div>
@@ -258,7 +312,9 @@ function field(label, value) {
 }
 
 function renderKVTable(obj) {
-  if (!obj || !Object.keys(obj).length) {return "—";}
+  if (!obj || !Object.keys(obj).length) {
+    return "—";
+  }
   let html = `<table class="ctx-table">`;
   for (const [k, v] of Object.entries(obj)) {
     html += `<tr><td class="ctx-key">${esc(k)}</td><td class="ctx-val">${esc(String(v))}</td></tr>`;
@@ -266,7 +322,6 @@ function renderKVTable(obj) {
   html += `</table>`;
   return html;
 }
-
 
 // ─── Prompt Extraction ─────────────────────────────────────────────
 // The user's original prompt is only preserved verbatim in EngineState
@@ -296,7 +351,9 @@ function showPromptBanner(promptText) {
   $promptBanner.classList.remove("hidden");
   $promptBanner.innerHTML =
     '<div class="prompt-banner-label">Original Prompt</div>' +
-    '<div class="prompt-banner-text">' + esc(promptText) + '</div>';
+    '<div class="prompt-banner-text">' +
+    esc(promptText) +
+    "</div>";
 }
 
 // ─── Main Load Orchestrator ────────────────────────────────────────
@@ -323,7 +380,11 @@ function loadData(data, isRefresh) {
   showPromptBanner(extractOriginalPrompt(data, type));
 
   if (!isRefresh) {
-    const labels = { "engine-state": "Engine State", "executable-score": "ExecutableScore", "saved-run": "SavedRun" };
+    const labels = {
+      "engine-state": "Engine State",
+      "executable-score": "ExecutableScore",
+      "saved-run": "SavedRun",
+    };
     showToast("Loaded: " + labels[type]);
   }
 }
@@ -349,13 +410,19 @@ function renderEngineHeader(state) {
     $pattern.textContent = i.active?.patternName ?? "No pattern";
     $prompt.textContent = i.prompt ?? "";
     $prompt.title = i.prompt ?? "";
-    $timing.textContent = "Started " + formatTime(i.startedAt) + " · " + elapsed(i.startedAt) + " elapsed";
+    $timing.textContent =
+      "Started " + formatTime(i.startedAt) + " · " + elapsed(i.startedAt) + " elapsed";
   } else if (state.kind === "done") {
     const sc = state.result.executableScore;
     const p = state.result.performance;
     $pattern.textContent = sc?.pattern ?? sc?.id ?? "Score";
     $prompt.textContent = "";
-    $timing.textContent = formatTime(p.startedAt) + " → " + formatTime(p.completedAt) + " · " + elapsed(p.startedAt, p.completedAt);
+    $timing.textContent =
+      formatTime(p.startedAt) +
+      " → " +
+      formatTime(p.completedAt) +
+      " · " +
+      elapsed(p.startedAt, p.completedAt);
   } else if (state.kind === "planned") {
     $pattern.textContent = "Planned";
     $prompt.textContent = state.algorithm?.prompt ?? "";
@@ -388,7 +455,7 @@ function renderEngineStepper(state) {
   let html = "";
   PHASES.forEach((name, i) => {
     const cls = i < activeIdx ? "complete" : i === activeIdx ? "active" : "";
-    html += `<div class="phase-step ${cls}" aria-label="Phase: ${name}, ${cls || 'pending'}">
+    html += `<div class="phase-step ${cls}" aria-label="Phase: ${name}, ${cls || "pending"}">
       <span class="step-num">${cls === "complete" ? "" : i + 1}</span>
       <span>${name}</span>
     </div>`;
@@ -431,7 +498,7 @@ function renderEngineLeftPanel(state) {
   }
 
   const perfMap = new Map();
-  performedBeats.forEach(pb => perfMap.set(pb.beatIndex, pb));
+  performedBeats.forEach((pb) => perfMap.set(pb.beatIndex, pb));
 
   let html = `<div class="section-title">Beat Sequence (${scoreBeats.length} beats)</div>`;
 
@@ -516,7 +583,7 @@ function renderScoreBeatFlow(beats) {
     html += `<span class="beat-index">#${idx}</span>`;
     html += `<span class="level-badge">L${beat.level}</span>`;
     if (beat.voices) {
-      beat.voices.forEach(v => {
+      beat.voices.forEach((v) => {
         html += `<span class="instrument-tag">${esc(v.instrument)}</span>`;
       });
     }
@@ -546,7 +613,12 @@ function renderSavedRun(run) {
   $pattern.textContent = patternName;
   $prompt.textContent = "Score: " + (score?.id ?? "—");
   $prompt.title = score?.id ?? "";
-  $timing.textContent = formatTime(perf?.startedAt) + " → " + formatTime(perf?.completedAt) + " · " + elapsed(perf?.startedAt, perf?.completedAt);
+  $timing.textContent =
+    formatTime(perf?.startedAt) +
+    " → " +
+    formatTime(perf?.completedAt) +
+    " · " +
+    elapsed(perf?.startedAt, perf?.completedAt);
 
   // Hide phase stepper — show all-complete stepper instead
   $stepper.classList.remove("hidden");
@@ -556,7 +628,7 @@ function renderSavedRun(run) {
   const scoreBeats = score?.beats ?? [];
   const performedBeats = perf?.beats ?? [];
   const perfMap = new Map();
-  performedBeats.forEach(pb => perfMap.set(pb.beatIndex, pb));
+  performedBeats.forEach((pb) => perfMap.set(pb.beatIndex, pb));
 
   let html = `<div class="section-title">Executed Beats (${scoreBeats.length} planned, ${performedBeats.length} performed)</div>`;
   html += renderPerformanceSummary(perf);
@@ -595,7 +667,9 @@ function renderAllCompleteStepper() {
 }
 
 function renderPatternScorePanel(patternScore) {
-  if (!patternScore) {return "";}
+  if (!patternScore) {
+    return "";
+  }
   let html = `<div class="pattern-score-panel">`;
   html += `<div class="section-title">Pattern Score (Template)</div>`;
   html += `<div class="pause-payload">`;
@@ -650,9 +724,11 @@ function renderBeatFlow(scoreBeats, perfMap, activeBeatIdx) {
     html += `<div class="beat-header">`;
     html += `<span class="beat-index">#${idx}</span>`;
     html += `<span class="level-badge">L${beat.level}</span>`;
-    if (idx === activeBeatIdx) {html += `<span class="active-badge">ACTIVE</span>`;}
+    if (idx === activeBeatIdx) {
+      html += `<span class="active-badge">ACTIVE</span>`;
+    }
     if (beat.voices) {
-      beat.voices.forEach(v => {
+      beat.voices.forEach((v) => {
         html += `<span class="instrument-tag">${esc(v.instrument)}</span>`;
       });
     }
@@ -669,8 +745,12 @@ function renderBeatFlow(scoreBeats, perfMap, activeBeatIdx) {
         const full = voice.output ?? "";
         const agentName = voice.producedBy || "unknown";
         const shortAgent = agentName.replace("maestro-", "");
-        const agentClass = agentName === "maestro-assessor" ? "agent-assessor"
-          : agentName === "maestro-executor" ? "agent-executor" : "agent-other";
+        const agentClass =
+          agentName === "maestro-assessor"
+            ? "agent-assessor"
+            : agentName === "maestro-executor"
+              ? "agent-executor"
+              : "agent-other";
         const confPct = Math.round((voice.confidence ?? 0) * 100);
 
         html += `<div class="subagent-branch">`;
@@ -712,7 +792,9 @@ function renderBeatFlow(scoreBeats, perfMap, activeBeatIdx) {
       html += `<div class="confidence-bar"><div class="confidence-bar-fill" style="width:${Math.round((verdict.confidence ?? 0) * 100)}%"></div></div>`;
       html += `<span class="confidence-label">${Math.round((verdict.confidence ?? 0) * 100)}%</span>`;
       html += `</div>`;
-      if (verdict.shouldTerminate) {html += `<span class="verdict-badge failed">TERM</span>`;}
+      if (verdict.shouldTerminate) {
+        html += `<span class="verdict-badge failed">TERM</span>`;
+      }
       html += `<span class="verdict-reason">${esc(verdict.reason ?? "")}</span>`;
       html += `</div>`;
     }
@@ -729,15 +811,21 @@ function renderBeatFlow(scoreBeats, perfMap, activeBeatIdx) {
 }
 
 function renderPerformanceSummary(perf) {
-  if (!perf) {return "";}
+  if (!perf) {
+    return "";
+  }
   const beats = perf.beats ?? [];
-  const applied = beats.filter(b => b.verdict?.outcome === "applied").length;
-  const skipped = beats.filter(b => b.verdict?.outcome === "skipped").length;
-  const failed  = beats.filter(b => b.verdict?.outcome === "failed").length;
-  const outcomeColor = perf.outcome === "success" ? "var(--color-applied)"
-    : perf.outcome === "failed" ? "var(--color-failed)"
-    : perf.outcome === "partial" ? "var(--color-skipped)"
-    : "var(--color-active)";
+  const applied = beats.filter((b) => b.verdict?.outcome === "applied").length;
+  const skipped = beats.filter((b) => b.verdict?.outcome === "skipped").length;
+  const failed = beats.filter((b) => b.verdict?.outcome === "failed").length;
+  const outcomeColor =
+    perf.outcome === "success"
+      ? "var(--color-applied)"
+      : perf.outcome === "failed"
+        ? "var(--color-failed)"
+        : perf.outcome === "partial"
+          ? "var(--color-skipped)"
+          : "var(--color-active)";
 
   return `<div class="perf-summary">
     <div class="perf-grid">
@@ -770,7 +858,9 @@ function renderPerformanceSummary(perf) {
 }
 
 function renderFrequencyMap(freqMap) {
-  if (!freqMap) {return "";}
+  if (!freqMap) {
+    return "";
+  }
   let html = `<div class="freq-map">`;
   html += `<div class="section-title">Frequency Map</div>`;
   html += field("Domain Key", freqMap.key);
@@ -786,7 +876,9 @@ function renderFrequencyMap(freqMap) {
 }
 
 function renderPausePanel(pause) {
-  if (!pause) {return `<div class="section-title">Pause</div><p style="color:var(--color-text-muted)">No active pause</p>`;}
+  if (!pause) {
+    return `<div class="section-title">Pause</div><p style="color:var(--color-text-muted)">No active pause</p>`;
+  }
 
   let html = `<div class="pause-panel">`;
   html += `<div class="section-title">Current Pause</div>`;
@@ -816,7 +908,9 @@ function renderPausePanel(pause) {
 }
 
 function renderPausePayload(kind, payload) {
-  if (!payload) {return "";}
+  if (!payload) {
+    return "";
+  }
   let html = "";
 
   switch (kind) {
@@ -843,7 +937,7 @@ function renderPausePayload(kind, payload) {
       if (payload.missingKeys?.length) {
         html += `<div class="payload-field">
           <div class="payload-label">Missing Keys</div>
-          <div class="payload-value">${payload.missingKeys.map(k => `<span class="missing-key">${esc(k)}</span>`).join(", ")}</div>
+          <div class="payload-value">${payload.missingKeys.map((k) => `<span class="missing-key">${esc(k)}</span>`).join(", ")}</div>
         </div>`;
       }
       if (payload.collected && Object.keys(payload.collected).length) {
@@ -872,7 +966,7 @@ function renderPausePayload(kind, payload) {
         if (payload.beat.voices) {
           html += `<div class="payload-field">
             <div class="payload-label">Voices</div>
-            <div class="payload-value">${payload.beat.voices.map(v => `<span class="instrument-tag">${esc(v.instrument)}</span>`).join(" ")}</div>
+            <div class="payload-value">${payload.beat.voices.map((v) => `<span class="instrument-tag">${esc(v.instrument)}</span>`).join(" ")}</div>
           </div>`;
         }
       }
@@ -897,7 +991,9 @@ function renderContextPanel(context, pause) {
   const missingKeys = (pause?.kind === "elicit-context" && pause.payload?.missingKeys) || [];
   const hasEntries = Object.keys(ctx).length > 0 || missingKeys.length > 0;
 
-  if (!hasEntries) {return "";}
+  if (!hasEntries) {
+    return "";
+  }
 
   let html = `<div class="context-panel">`;
   html += `<div class="section-title">Context</div>`;
@@ -918,7 +1014,9 @@ function renderContextPanel(context, pause) {
 }
 
 function renderScoreInfo(score) {
-  if (!score) {return "";}
+  if (!score) {
+    return "";
+  }
   let html = `<div class="section-title">Score Info</div>`;
   html += `<div class="pause-payload">`;
   html += field("ID", score.id);
@@ -934,14 +1032,18 @@ function renderScoreInfo(score) {
 }
 
 // ─── Voice Toggle ──────────────────────────────────────────────────
-window.toggleVoice = function(voiceId) {
+window.toggleVoice = function (voiceId) {
   const output = document.getElementById(voiceId + "-output");
   const arrow = document.getElementById(voiceId + "-arrow");
-  if (!output || !arrow) {return;}
+  if (!output || !arrow) {
+    return;
+  }
   const isOpen = output.classList.toggle("expanded");
   arrow.classList.toggle("open", isOpen);
   const header = arrow.closest(".voice-header");
-  if (header) {header.setAttribute("aria-expanded", String(isOpen));}
+  if (header) {
+    header.setAttribute("aria-expanded", String(isOpen));
+  }
 };
 
 // ════════════════════════════════════════════════════════════════════
@@ -951,9 +1053,13 @@ window.toggleVoice = function(voiceId) {
 async function tryLoadManifest() {
   try {
     const res = await fetch("/api/manifest");
-    if (!res.ok) { return; }
+    if (!res.ok) {
+      return;
+    }
     manifest = await res.json();
-    if (!Array.isArray(manifest) || manifest.length === 0) { return; }
+    if (!Array.isArray(manifest) || manifest.length === 0) {
+      return;
+    }
     showLibrary();
   } catch {
     // Not served via dev server — library stays hidden
@@ -974,55 +1080,84 @@ function renderLibrary(entries) {
 
   const groups = {};
   for (const entry of entries) {
-    const groupKey = entry.category === "run"
-      ? "Runs — " + entry.pattern
-      : entry.category === "baseline"
-        ? "Baselines"
-        : "Fixtures";
-    if (!groups[groupKey]) { groups[groupKey] = []; }
+    const groupKey =
+      entry.category === "run"
+        ? "Runs — " + entry.pattern
+        : entry.category === "baseline"
+          ? "Baselines"
+          : "Fixtures";
+    if (!groups[groupKey]) {
+      groups[groupKey] = [];
+    }
     groups[groupKey].push(entry);
   }
 
   let html = "";
   for (const [groupName, items] of Object.entries(groups)) {
     html += '<div class="library-group">';
-    html += '<div class="library-group-header">' + esc(groupName) + ' <span class="library-group-count">(' + items.length + ')</span></div>';
+    html +=
+      '<div class="library-group-header">' +
+      esc(groupName) +
+      ' <span class="library-group-count">(' +
+      items.length +
+      ")</span></div>";
     for (const item of items) {
       const promptSnippet = item.prompt ? truncate(item.prompt, 60) : "";
       const dateStr = item.timestamp ? friendlyDate(item.timestamp) : "";
       const typeLabel = item.category === "run" ? "saved run" : item.category;
-      const outcomeClass = item.outcome === "success" ? "applied"
-        : item.outcome === "failed" ? "failed"
-        : item.outcome === "partial" ? "skipped" : "";
+      const outcomeClass =
+        item.outcome === "success"
+          ? "applied"
+          : item.outcome === "failed"
+            ? "failed"
+            : item.outcome === "partial"
+              ? "skipped"
+              : "";
 
-      html += '<div class="library-item" data-path="' + esc(item.path) + '" role="button" tabindex="0" title="' + esc(item.filename) + '">';
+      html +=
+        '<div class="library-item" data-path="' +
+        esc(item.path) +
+        '" role="button" tabindex="0" title="' +
+        esc(item.filename) +
+        '">';
       html += '<div class="library-item-main">';
       if (promptSnippet) {
-        html += '<div class="library-item-prompt">' + esc(promptSnippet) + '</div>';
+        html += '<div class="library-item-prompt">' + esc(promptSnippet) + "</div>";
       } else {
-        html += '<div class="library-item-name">' + esc(item.filename.replace(".json", "")) + '</div>';
+        html +=
+          '<div class="library-item-name">' + esc(item.filename.replace(".json", "")) + "</div>";
       }
-      if (dateStr) { html += '<div class="library-item-time">' + esc(dateStr) + '</div>'; }
-      html += '</div>';
+      if (dateStr) {
+        html += '<div class="library-item-time">' + esc(dateStr) + "</div>";
+      }
+      html += "</div>";
       html += '<div class="library-item-badges">';
       if (item.outcome) {
-        html += '<span class="library-item-outcome ' + outcomeClass + '">' + esc(item.outcome) + '</span>';
+        html +=
+          '<span class="library-item-outcome ' +
+          outcomeClass +
+          '">' +
+          esc(item.outcome) +
+          "</span>";
       }
       if (item.beatCount != null) {
-        html += '<span class="library-item-beats">' + item.beatCount + ' beats</span>';
+        html += '<span class="library-item-beats">' + item.beatCount + " beats</span>";
       }
-      html += '<span class="library-item-type">' + esc(typeLabel) + '</span>';
-      html += '</div>';
-      html += '</div>';
+      html += '<span class="library-item-type">' + esc(typeLabel) + "</span>";
+      html += "</div>";
+      html += "</div>";
     }
-    html += '</div>';
+    html += "</div>";
   }
   $libraryList.innerHTML = html;
 
-  $libraryList.querySelectorAll(".library-item").forEach(el => {
+  $libraryList.querySelectorAll(".library-item").forEach((el) => {
     el.addEventListener("click", () => loadFromLibrary(el.dataset.path));
     el.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); loadFromLibrary(el.dataset.path); }
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        loadFromLibrary(el.dataset.path);
+      }
     });
   });
 }
@@ -1030,7 +1165,10 @@ function renderLibrary(entries) {
 async function loadFromLibrary(path) {
   try {
     const res = await fetch(path);
-    if (!res.ok) { showToast("Failed to load: " + res.statusText); return; }
+    if (!res.ok) {
+      showToast("Failed to load: " + res.statusText);
+      return;
+    }
     const data = await res.json();
     loadData(data);
   } catch (err) {
@@ -1045,12 +1183,13 @@ if ($librarySearch) {
       renderLibrary(manifest);
       return;
     }
-    const filtered = manifest.filter(e =>
-      e.filename.toLowerCase().includes(query) ||
-      (e.pattern ?? "").toLowerCase().includes(query) ||
-      e.category.toLowerCase().includes(query) ||
-      (e.prompt ?? "").toLowerCase().includes(query) ||
-      (e.outcome ?? "").toLowerCase().includes(query)
+    const filtered = manifest.filter(
+      (e) =>
+        e.filename.toLowerCase().includes(query) ||
+        (e.pattern ?? "").toLowerCase().includes(query) ||
+        e.category.toLowerCase().includes(query) ||
+        (e.prompt ?? "").toLowerCase().includes(query) ||
+        (e.outcome ?? "").toLowerCase().includes(query),
     );
     renderLibrary(filtered);
   });
