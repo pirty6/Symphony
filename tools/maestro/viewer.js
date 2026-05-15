@@ -136,11 +136,11 @@ async function startWatching() {
         const text = await file.text();
         const data = JSON.parse(text);
         loadData(data, true);
-      } catch (_) {
+      } catch {
         /* ignore transient read errors */
       }
     }, 2000);
-  } catch (_) {
+  } catch {
     $watchToggle.checked = false;
   }
 }
@@ -157,7 +157,7 @@ $backBtn.addEventListener("click", () => {
   stopWatching();
   $watchToggle.checked = false;
   fileHandle = undefined;
-  if ($promptBanner) $promptBanner.classList.add("hidden");
+  if ($promptBanner) { $promptBanner.classList.add("hidden"); }
   $viewer.classList.remove("visible");
   $dropZone.classList.remove("hidden");
 });
@@ -332,10 +332,10 @@ function renderKVTable(obj) {
 function extractOriginalPrompt(data, type) {
   if (type === "engine-state") {
     // "running" state preserves internal.prompt
-    if (data.kind === "running") return data.internal?.prompt ?? "";
+        if (data.kind === "running") { return data.internal?.prompt ?? ""; }
     // "done" state drops internal — prompt is not available
-    if (data.kind === "done") return "";
-    if (data.kind === "planned") return data.algorithm?.prompt ?? "";
+        if (data.kind === "done") { return ""; }
+        if (data.kind === "planned") { return data.algorithm?.prompt ?? ""; }
     return "";
   }
   // SavedRun and ExecutableScore do not store the raw prompt.
@@ -345,7 +345,7 @@ function extractOriginalPrompt(data, type) {
 
 function showPromptBanner(promptText) {
   if (!promptText || !$promptBanner) {
-    if ($promptBanner) $promptBanner.classList.add("hidden");
+    if ($promptBanner) { $promptBanner.classList.add("hidden"); }
     return;
   }
   $promptBanner.classList.remove("hidden");
@@ -697,12 +697,12 @@ function renderPatternScorePanel(patternScore) {
 // ════════════════════════════════════════════════════════════════════
 
 function agentIcon(producedBy) {
-  if (producedBy === "maestro-assessor") return "\u{1F50D}";
-  if (producedBy === "maestro-executor") return "\u{270F}\u{FE0F}";
-  if (producedBy === "maestro-proposer") return "\u{1F4DD}";
-  if (producedBy === "maestro-skeptic") return "\u{1F9D0}";
-  if (producedBy === "maestro-pragmatist") return "\u{2696}\u{FE0F}";
-  if (producedBy === "maestro-template-critic") return "\u{1F3AF}";
+  if (producedBy === "maestro-assessor") { return "\u{1F50D}"; }
+  if (producedBy === "maestro-executor") { return "\u{270F}\u{FE0F}"; }
+  if (producedBy === "maestro-proposer") { return "\u{1F4DD}"; }
+  if (producedBy === "maestro-skeptic") { return "\u{1F9D0}"; }
+  if (producedBy === "maestro-pragmatist") { return "\u{2696}\u{FE0F}"; }
+  if (producedBy === "maestro-template-critic") { return "\u{1F3AF}"; }
   return "\u{26A1}";
 }
 
@@ -1140,7 +1140,7 @@ function renderLibrary(entries) {
           esc(item.outcome) +
           "</span>";
       }
-      if (item.beatCount != null) {
+      if (item.beatCount !== undefined && item.beatCount !== null) {
         html += '<span class="library-item-beats">' + item.beatCount + " beats</span>";
       }
       html += '<span class="library-item-type">' + esc(typeLabel) + "</span>";
