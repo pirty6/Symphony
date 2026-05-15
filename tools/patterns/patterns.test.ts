@@ -35,6 +35,7 @@ describe("PatternLibrary", () => {
       "fix",
       "cover",
       "regress",
+      "document",
       "lint",
     ]);
     expect(fix.requiredContext).toEqual(["bug", "reproduction"]);

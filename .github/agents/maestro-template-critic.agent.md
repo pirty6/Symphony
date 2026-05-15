@@ -22,7 +22,7 @@ You receive from maestro:
 4. **Proposer's draft**
 5. **Skeptic's output**
 6. **Pragmatist's output** — including any WRONG PATTERN flags
-7. **Available patterns** — output of `yarn tsx /Users/perezgarciam/Documents/git/Symphony/tools/symphony/cli.ts list-patterns`
+7. **Available patterns** — output of `yarn tsx $SYMPHONY/tools/patterns/cli.ts list --json` (provided by the Composer)
 
 ## Output contract
 

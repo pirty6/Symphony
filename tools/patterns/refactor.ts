@@ -8,7 +8,7 @@
  */
 
 import type { Pattern, PatternScore } from "./types";
-import { LINT_BEAT } from "./shared";
+import { DOCS_BEAT, LINT_BEAT } from "./shared";
 
 const score: PatternScore = {
   pattern: "refactor",
@@ -49,7 +49,6 @@ const score: PatternScore = {
       directive:
         "Verify equivalence — re-run the baseline commands covering the survey surface from beat 'survey'. Integration tests outside the default run may need to be triggered explicitly.",
     },
-    LINT_BEAT,
     {
       step: "prune",
       level: 2,
@@ -57,6 +56,8 @@ const score: PatternScore = {
       directive:
         "Prune scaffolding — remove every item tagged in beat 'execute'. Re-verify equivalence. Dead aliases rot quickly and the second pass rarely happens.",
     },
+    LINT_BEAT,
+    DOCS_BEAT,
   ],
 };
 

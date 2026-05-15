@@ -28,32 +28,32 @@ output actually satisfies its directive.
 
 ## Driving the engine
 
-The Symphony tooling lives at a fixed absolute path on this machine:
+The Symphony tooling lives at a fixed absolute path on this machine.
+**Update this single line** to match your clone location — every
+command below uses `$SYMPHONY`, so this is the only place to change:
 
 ```
 SYMPHONY=/Users/perezgarciam/Documents/git/Symphony
 ```
 
-Always invoke the CLIs with this absolute path so the commands work from
-any workspace cwd (the target repo you are operating on need not be
-Symphony itself). File edits, tests, and builds still run in the
-target repo's cwd; only the CLI binaries are absolute.
+File edits, tests, and builds still run in the target repo's cwd;
+only the CLI binaries use the absolute `$SYMPHONY` path.
 
 Routing happens **outside** the engine. Pick a pattern (or `"new"`)
 before `start`:
 
 ```bash
 # 1. List patterns: { pattern, domain, description, requiredContext, beats }.
-yarn tsx /Users/perezgarciam/Documents/git/Symphony/tools/patterns/cli.ts list --json
+yarn tsx $SYMPHONY/tools/patterns/cli.ts list --json
 
 # 2. Start the run. Writes opaque state; exits 2 with first Pause.
-yarn tsx /Users/perezgarciam/Documents/git/Symphony/tools/maestro/cli.ts start \
+yarn tsx $SYMPHONY/tools/maestro/cli.ts start \
   --prompt  "<user's original prompt>" \
   --pattern "<chosen-name|new>" \
   --state   /tmp/<slug>.state.json
 
 # 3. Apply each Resolution. Exit 2 = next Pause; 0 = done; 1 = failed.
-yarn tsx /Users/perezgarciam/Documents/git/Symphony/tools/maestro/cli.ts resolve \
+yarn tsx $SYMPHONY/tools/maestro/cli.ts resolve \
   --state      /tmp/<slug>.state.json \
   --resolution '<json>'
 ```
@@ -245,12 +245,12 @@ When the engine reaches `done`, stdout is `{ status, executableScore,
 performance }`. Persist with Symphony tooling:
 
 ```bash
-yarn tsx /Users/perezgarciam/Documents/git/Symphony/tools/symphony/cli.ts save-run \
+yarn tsx $SYMPHONY/tools/symphony/cli.ts save-run \
   --pattern     <name> \
   --score       <executableScore-as-file> \
   --performance <performance-as-file>
 
-yarn tsx /Users/perezgarciam/Documents/git/Symphony/tools/symphony/cli.ts verify --file <returned-path>
+yarn tsx $SYMPHONY/tools/symphony/cli.ts verify --file <returned-path>
 ```
 
 ---

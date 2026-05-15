@@ -7,7 +7,7 @@
  */
 
 import type { Pattern, PatternScore } from "./types";
-import { LINT_BEAT } from "./shared";
+import { DOCS_BEAT, LINT_BEAT } from "./shared";
 
 const score: PatternScore = {
   pattern: "fix",
@@ -48,6 +48,7 @@ const score: PatternScore = {
       directive:
         "Run the full test suite plus the new regression test; all must pass. This is not an equivalence check — behavior changed by design — but every previously green test must remain green.",
     },
+    DOCS_BEAT,
     LINT_BEAT,
   ],
 };

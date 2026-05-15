@@ -1,6 +1,8 @@
-# Maestro and Symphony, from scratch
+# Symphony
 
-## The problem they solve
+A framework for building deterministic, auditable AI agent workflows. Symphony separates planning from execution and puts a state machine — not the AI — in charge of the workflow.
+
+## The problem it solves
 
 When you ask a chat AI to do a multi-step coding task ("refactor this", "add this feature", "investigate this bug"), the AI plans the steps _and_ executes them in the same head. It can skip steps, hallucinate that it did things it didn't, or drift mid-task. There's no referee.
 
@@ -10,37 +12,72 @@ Symphony and Maestro are this repo's answer: **separate the planning from the do
 
 - **Symphony** is the _idea and the data shapes_. It says: every task is a sequence of small, named steps called **beats**. The full plan — the list of beats plus the inputs they need — is a **Score** (think: musical sheet music). The recording of what actually happened when you ran it is a **Performance**. Both are JSON files saved to disk, so you can audit, replay, and diff runs.
 
-- **Maestro** is the _program that runs a Score_. It's a small state machine in TypeScript (engine.ts). It decides what to do next; the AI only fills in the parts that need judgment.
+- **Maestro** is the _program that runs a Score_. It's a small state machine in TypeScript (`tools/maestro/engine.ts`). It decides what to do next; the AI only fills in the parts that need judgment.
 
-## A Pattern is a pre-built Score template
+## Patterns
 
-The repo ships three Patterns (patterns):
+A Pattern is a pre-built Score template. The repo ships four:
 
-- **`feature`** — add a new capability
-- **`refactor`** — restructure code without changing behavior
-- **`investigate`** — answer a question about the codebase
+| Pattern         | Domain        | Required context         | Beats                                                                    |
+| --------------- | ------------- | ------------------------ | ------------------------------------------------------------------------ |
+| **`feature`**   | feature       | `scope`, `contract`      | frame → test → sketch → implement → cover → verify → lint               |
+| **`refactor`**  | refactor      | `target`, `invariant`    | frame → survey → plan → execute → verify → document → lint → prune      |
+| **`fix`**       | fix           | `bug`, `reproduction`    | reproduce → diagnose → fix → cover → regress → document → lint          |
+| **`investigate`** | investigate | _(none)_                 | clarify → scope → map → hypothesize → answer → recommend                |
 
-Each Pattern is just a list of beats in a specific order. For example, refactor's beats are: `frame → survey → plan → execute → verify → prune`. Each beat has a directive (what to do) and a tag for what kind of work it is (read-only analysis vs. file edit vs. decision).
-
-These Patterns were _pre-debated_ — humans argued about the right beat sequence once, saved it, and now every refactor follows the same proven script. You don't re-derive the playbook every time.
+Each Pattern is a list of beats in a specific order. Each beat has a directive (what to do), a level (abstraction tier, 1–8), and voices with instrument types (`analyze`, `decide`, `question`, `order`, `integrate`). These Patterns were _pre-debated_ — the right beat sequence was argued once, saved, and now every run follows the same proven script.
 
 ## How a prompt flows through Maestro
 
 You type something like _"refactor the prompts to use fewer tokens"_. Then:
 
-1. **Pick a Pattern.** `feature`, `refactor`, `investigate`, or `new` (let Maestro draft a custom one).
+1. **Pick a Pattern.** `feature`, `refactor`, `fix`, `investigate`, or `new` (let Maestro draft a custom one).
 2. **Maestro pauses and asks: "is this Pattern a good fit?"** You say yes or reroute.
 3. **Maestro asks for the missing inputs.** Each Pattern declares required fields (refactor needs `target` and `invariant`). Maestro refuses to advance until you fill them in. No guessing.
 4. **Go gate.** Maestro asks for explicit approval. Only specific phrases work: `go`, `approved`, `proceed`, `looks good`, `ship it`. Vague approval is rejected.
 5. **Beat-by-beat execution.** For each beat, Maestro spawns a small specialized AI:
    - **Assessor** — read-only. Searches code, reads files, returns findings.
    - **Executor** — write-only. Applies file edits as instructed.
-     The engine validates each AI's response shape (right fields, valid confidence number, valid outcome). Malformed responses are rejected.
-6. **Done.** A `Performance` JSON file is saved to store recording what every beat did. You can re-verify or replay it later.
+
+   The engine validates each AI's response shape (right fields, valid confidence number, valid outcome). Malformed responses are rejected.
+6. **Done.** A `Performance` JSON file records what every beat did. You can re-verify or replay it later.
+
+## Architecture
+
+### The compiler pipeline
+
+The compiler (`tools/compiler/compile.ts`) transforms a Pattern + user context into an `ExecutableScore`:
+
+1. Validates that all `requiredContext` keys are present.
+2. Builds a `FrequencyMap` from the beat histogram (level × instrument distribution).
+3. Asserts beat legality against the level/instrument matrix.
+4. Computes a deterministic content-hash `id` for the Score.
+
+There's also `parseAlgorithm()` for converting free-form algorithm descriptions (from the `new` pattern draft flow) into Scores, and `algorithmFromPattern()` for the `maestro plan` handoff.
+
+### Typed event system
+
+The engine emits a typed `MaestroEvent` union (`tools/maestro/types/event.ts`) with 13 event kinds: `run-started`, `pause-emitted`, `pattern-confirmed`, `pattern-rerouted`, `complexity-classified`, `draft-round-completed`, `context-collected`, `score-compiled`, `beat-started`, `beat-completed`, `run-completed`, `run-failed`, and `run-planned`. Events are pure return values from the engine (no side effects) and support visualization, structured logging, and CI integration.
+
+### Visual run viewer
+
+`tools/maestro/viewer.html` is a standalone viewer (no build step) that visualizes Maestro artifacts. It auto-detects the file type and renders accordingly:
+
+- **Engine state files** (`.state.json`): beat-by-beat timeline with instrument budgets, confidence scores, verdict badges, expandable voice outputs, and live watch mode.
+- **ExecutableScore files**: the compiled plan showing beat sequence, frequency map, domain key, context, and pattern provenance.
+- **SavedRun files** (from `tools/scores/store/`): the Score's planned beats alongside the Performance's actual results — verdicts, confidence, outcomes, timing, and the original pattern template.
+
+Drag-and-drop any JSON file or paste it. Dark theme, fully client-side. The viewer is split into three files: `viewer.html` (structure), `viewer.css` (styles), and `viewer.js` (logic).
+
+### Beat legality
+
+The legality matrix (`tools/symphony/legality.ts`) governs which level/instrument pairs are valid. Illegal pairs (e.g., level 1 + `question`, level 8 + `order`) are rejected at compile time, preventing incoherent beat definitions.
+
+### Persistence and replay
+
+Every completed run is saved as a `SavedRun` JSON file under `tools/scores/store/<pattern>/`. The `verify` CLI command can detect divergence between a saved run and a fresh Performance, enabling regression detection and replay.
 
 ## Why this beats a normal chat agent
-
-Imagine a chat agent doing the same refactor. It reads your prompt, picks an approach in its head, edits files, claims it ran tests. If it skipped a step or made up a result, you only find out when something breaks.
 
 |                                 | Plain chat agent                | Chat agent + skill file  | Maestro / Symphony                |
 | ------------------------------- | ------------------------------- | ------------------------ | --------------------------------- |
@@ -51,21 +88,64 @@ Imagine a chat agent doing the same refactor. It reads your prompt, picks an app
 | Audit trail?                    | Chat log                        | Chat log                 | JSON artifact you can replay      |
 | Failure mode                    | Hallucinated steps slip through | Skill quietly ignored    | State machine simply won't move   |
 
-**The core shift:** in a chat, the AI's instructions are _suggestions it may follow loosely_. In Maestro, the same instructions are _rules the engine enforces_. The AI is only trusted with the parts that genuinely need judgment ("does this Pattern fit?", "did this beat achieve its directive?") — the _order_, the _gates_, and the _shape of the work_ are owned by code, not by the model.
-
-A skill tells the AI what _should_ happen. Symphony refuses to continue when it doesn't.
+**The core shift:** in a chat, the AI's instructions are _suggestions it may follow loosely_. In Maestro, the same instructions are _rules the engine enforces_. The AI is only trusted with the parts that genuinely need judgment — the _order_, the _gates_, and the _shape of the work_ are owned by code, not by the model.
 
 ## Contributing
 
 ### Prerequisites
 
-- Node.js 20.x
-- Yarn (the repo uses `yarn.lock` for dependency resolution)
+- **Node.js 20+** — CI runs on Node 20; the codebase uses `@types/node` v25 and TypeScript 6
+- **Yarn** — the repo uses `yarn.lock` for dependency resolution; install via `corepack enable && corepack prepare yarn@stable --activate` or see [yarnpkg.com](https://yarnpkg.com/getting-started/install)
 
 ### Setup
 
 ```sh
-yarn install
+git clone https://github.com/pirty6/Symphony.git
+cd Symphony && yarn install
+```
+
+#### Using Maestro in VS Code Chat
+
+Maestro registers as a VS Code Chat agent via `.github/agents/maestro.agent.md`. There are two scopes:
+
+**When the Symphony repo is open** — `/maestro` appears in Chat automatically. VS Code discovers `.github/agents/*.agent.md` files in the workspace and registers them as chat agents. No extra setup needed.
+
+**In any VS Code workspace (global)** — symlink the agent and prompt files to the VS Code user prompts directory:
+
+```sh
+# From the Symphony repo root
+PROMPTS_DIR="$HOME/Library/Application Support/Code/User/prompts"  # macOS
+# Linux:  PROMPTS_DIR="$HOME/.config/Code/User/prompts"
+# Windows: PROMPTS_DIR="$APPDATA/Code/User/prompts"
+
+mkdir -p "$PROMPTS_DIR"
+
+# Symlink all agent files (maestro + its sub-agents)
+for f in .github/agents/*.agent.md; do
+  ln -snf "$(pwd)/$f" "$PROMPTS_DIR/$(basename "$f")"
+done
+
+# Symlink the maestro mode entry (registers /maestro in the Chat mode picker)
+ln -snf "$(pwd)/.github/prompts/maestro.prompt.md" "$PROMPTS_DIR/maestro.prompt.md"
+```
+
+After this, `/maestro` appears in every VS Code window regardless of which repo is open.
+
+**Required: set your clone path.** The agent instructions reference Symphony's CLI tools via an absolute path. Open `.github/agents/maestro.agent.md` and update the `SYMPHONY=` line to your clone location:
+
+```sh
+SYMPHONY=/path/to/your/Symphony
+```
+
+This path is used at runtime to invoke `tools/maestro/cli.ts` and `tools/patterns/cli.ts`. Since the symlinks point back to the repo, you only edit it once.
+
+#### Symlink for global CLI access (optional)
+
+If you want to run the Maestro CLI from other repos without specifying the full path, create a symlink:
+
+```sh
+# From the Symphony repo root — adjust the target if your clone is elsewhere
+ln -snf "$(pwd)/tools/maestro/cli.ts" /usr/local/bin/maestro-cli
 ```
 
 The `prepare` script installs Husky's git hooks on first install.
@@ -77,7 +157,7 @@ These three commands are the contract — CI and the `pre-push` hook run the sam
 ```sh
 yarn lint         # oxlint
 yarn typecheck    # tsc -p tools/tsconfig.typecheck.json
-yarn test            # jest --config tools/jest.config.js
+yarn test         # jest --config tools/jest.config.js
 ```
 
 ### Pre-push hook
@@ -87,70 +167,4 @@ To bypass in an emergency: `git push --no-verify` (discouraged — CI will still
 
 ### CI
 
-GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `main` and
-every pull request targeting `main`, executing the same three commands on
-Node 20. A green local run should imply a green CI run.
-
-### Baselines
-
-Performance baselines under `tools/scores/baselines/` gate the non-regression
-suite. When a pattern's beat sequence changes, the corresponding baseline must
-be refreshed from a fresh SavedRun. See
-[tools/scores/baselines/README.md](tools/scores/baselines/README.md).
-
-## Using Maestro in your VS Code workspaces
-
-Maestro runs as a VS Code Copilot Chat agent. The agent definitions live in `.github/agents/` inside this repo. VS Code automatically discovers `.agent.md` files in that directory and registers them as chat participants, so the setup is: clone Symphony once, then link its agents into every workspace where you want Maestro available.
-
-### One-time setup
-
-1. **Clone Symphony** somewhere permanent on your machine:
-
-   ```sh
-   git clone https://github.com/<org>/Symphony.git ~/Symphony
-   cd ~/Symphony && yarn install
-   ```
-
-2. **Update the absolute path in `maestro.agent.md`.** Open `.github/agents/maestro.agent.md` and change the `SYMPHONY=` line to match where you cloned the repo:
-
-   ```sh
-   SYMPHONY=/Users/<you>/Symphony
-   ```
-
-   Every CLI invocation in the agent file uses this path, so it must be correct. Do the same for any hardcoded paths in the file (the `yarn tsx ...` commands).
-
-### Per-workspace setup
-
-For each VS Code workspace where you want to use Maestro, symlink the agents directory:
-
-```sh
-cd /path/to/your-project
-mkdir -p .github
-ln -s ~/Symphony/.github/agents .github/agents
-```
-
-This creates a symlink so VS Code discovers the agent files without duplicating them. When you update Symphony (e.g. `git pull`), every workspace picks up the changes automatically.
-
-> **Tip:** If you prefer not to commit the symlink to your project's repo, add `.github/agents` to your project's `.gitignore`.
-
-### Using Maestro
-
-Once the agents are linked, open VS Code Copilot Chat and switch to **maestro** mode (click the mode selector at the top of the chat panel). Then just describe your task:
-
-- _"refactor the auth module to use dependency injection"_
-- _"add a rate-limiting middleware to the API"_
-- _"investigate why the tests flake on CI"_
-
-Maestro will:
-
-1. Pick a pattern (`feature`, `refactor`, `investigate`, or `fix`) — or draft a new one.
-2. Ask you to confirm the fit and fill in required context.
-3. Present a go-gate for explicit approval.
-4. Execute beat-by-beat, spawning read-only assessors and write-only executors.
-5. Save a `Performance` JSON artifact you can audit.
-
-### Requirements
-
-- **VS Code** with GitHub Copilot Chat (agent mode must be enabled).
-- **Node.js 20+** — Symphony's CLIs run via `yarn tsx`, which needs Node and the installed dependencies in the Symphony clone.
-- The Symphony repo must have its dependencies installed (`yarn install`).
+GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `main` and every pull request targeting `main`, executing the same three commands on Node 20. A green local run should imply a green CI run.
