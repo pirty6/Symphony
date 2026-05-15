@@ -41,7 +41,8 @@ import {
 import type { Pause, PatternSummary } from "./types/pause";
 import type { Resolution } from "./types/resolution";
 import type { Complexity, VoiceProducer } from "./types/types";
-import type { EngineConfig, EngineState, InternalState } from "./types/engine";
+import type { AdvanceResult, EngineConfig, EngineState, InternalState } from "./types/engine";
+import type { MaestroEvent } from "./types/event";
 import {
   defaultClock,
   defaultPauseIdFactory,
@@ -77,6 +78,44 @@ export const MAESTRO_DRAFT_MAX_ROUNDS = 6;
  */
 export const VOICE_PRODUCERS: readonly VoiceProducer[] =
   RUNNER_VOICE_PRODUCERS as readonly VoiceProducer[];
+
+// ── Event helpers ───────────────────────────────────────────────────
+
+function withEvents(state: EngineState, events: readonly MaestroEvent[]): AdvanceResult {
+  return Object.assign({}, state, { events }) as AdvanceResult;
+}
+
+function appendTerminalEvents(state: EngineState, events: MaestroEvent[]): void {
+  switch (state.kind) {
+    case "running":
+      if (state.pause.kind === "perform-beat") {
+        events.push({
+          kind: "beat-started",
+          beatIndex: state.pause.payload.beatIndex,
+          directive: state.pause.payload.beat.directive,
+        });
+      }
+      events.push({
+        kind: "pause-emitted",
+        pauseKind: state.pause.kind,
+        pauseId: state.pause.pauseId,
+      });
+      break;
+    case "done":
+      events.push({
+        kind: "run-completed",
+        outcome: state.result.performance.outcome,
+        beatCount: state.result.performance.beats.length,
+      });
+      break;
+    case "failed":
+      events.push({ kind: "run-failed", error: state.error });
+      break;
+    case "planned":
+      events.push({ kind: "run-planned", outPath: state.outPath });
+      break;
+  }
+}
 
 // ── Runs ───────────────
 
@@ -214,11 +253,14 @@ export function runResolve(stateFile: string, resolutionRaw: string): void {
  * to `createEngine`. There is no routing pause; the engine begins with
  * an active pattern (or with the explicit intent to draft one).
  */
-export function createEngine(config: EngineConfig): EngineState {
+export function createEngine(config: EngineConfig): AdvanceResult {
   const clock = config.clock ?? defaultClock;
   const newPauseId = config.pauseIdFactory ?? defaultPauseIdFactory;
   const prompt = config.prompt;
   const pattern = config.pattern;
+
+  const events: MaestroEvent[] = [];
+  events.push({ kind: "run-started", prompt, pattern });
 
   const internal: InternalState = {
     prompt,
@@ -234,13 +276,19 @@ export function createEngine(config: EngineConfig): EngineState {
   };
 
   if (pattern === "new") {
-    return enterClassifyComplexity(internal, newPauseId);
+    const state = enterClassifyComplexity(internal, newPauseId);
+    appendTerminalEvents(state, events);
+    return withEvents(state, events);
   }
   const target = findPattern(internal.patterns, pattern);
   if (!target) {
-    return failed(`createEngine: pattern '${pattern}' not registered (use "new" to draft)`);
+    const state = failed(`createEngine: pattern '${pattern}' not registered (use "new" to draft)`);
+    appendTerminalEvents(state, events);
+    return withEvents(state, events);
   }
-  return enterConfirmFit(internal, summaryOf(target), newPauseId);
+  const state = enterConfirmFit(internal, summaryOf(target), newPauseId);
+  appendTerminalEvents(state, events);
+  return withEvents(state, events);
 }
 
 // ── Reducer ────────────────────────────────────────────────────────
@@ -255,17 +303,21 @@ export function advance(
   state: EngineState,
   resolution: Resolution,
   opts: AdvanceOptions = {},
-): EngineState {
+): AdvanceResult {
   if (state.kind !== "running") {
-    return state;
+    return withEvents(state, []);
   }
   const pause = state.pause;
   const internal = state.internal;
   const clock = opts.clock ?? defaultClock;
   const newPauseId = opts.pauseIdFactory ?? defaultPauseIdFactory;
 
+  const events: MaestroEvent[] = [];
+
   if (pause.kind !== resolution.kind) {
-    return failed(`resolution kind '${resolution.kind}' does not match pause '${pause.kind}'`);
+    const next = failed(`resolution kind '${resolution.kind}' does not match pause '${pause.kind}'`);
+    appendTerminalEvents(next, events);
+    return withEvents(next, events);
   }
 
   // Idempotency guard: every Resolution must echo the current Pause's
@@ -273,28 +325,42 @@ export function advance(
   // a stale resolution from a prior turn) is rejected here, not
   // silently accepted as a fresh transition.
   if (typeof resolution.pauseId !== "string" || resolution.pauseId === "") {
-    return failed(`${pause.kind}: resolution.pauseId is required (expected '${pause.pauseId}')`);
+    const next = failed(`${pause.kind}: resolution.pauseId is required (expected '${pause.pauseId}')`);
+    appendTerminalEvents(next, events);
+    return withEvents(next, events);
   }
   if (resolution.pauseId !== pause.pauseId) {
-    return failed(
+    const next = failed(
       `${pause.kind}: pauseId mismatch (got '${resolution.pauseId}', expected '${pause.pauseId}')`,
     );
+    appendTerminalEvents(next, events);
+    return withEvents(next, events);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- exhaustive switch guarantees assignment
+  let next!: EngineState;
   switch (pause.kind) {
     case "confirm-fit":
-      return resolveConfirmFit(internal, resolution as ConfirmRes, newPauseId);
+      next = resolveConfirmFit(internal, resolution as ConfirmRes, newPauseId, events);
+      break;
     case "classify-complexity":
-      return resolveClassifyComplexity(internal, resolution as ClassifyRes, newPauseId);
+      next = resolveClassifyComplexity(internal, resolution as ClassifyRes, newPauseId, events);
+      break;
     case "draft-pattern-round":
-      return resolveDraftRound(internal, resolution as DraftRes, pause, newPauseId);
+      next = resolveDraftRound(internal, resolution as DraftRes, pause, newPauseId, events);
+      break;
     case "elicit-context":
-      return resolveElicitContext(internal, resolution as ElicitRes, newPauseId);
+      next = resolveElicitContext(internal, resolution as ElicitRes, newPauseId, events);
+      break;
     case "go-gate":
-      return resolveGoGate(internal, resolution as GoRes, clock, newPauseId);
+      next = resolveGoGate(internal, resolution as GoRes, clock, newPauseId, events);
+      break;
     case "perform-beat":
-      return resolvePerformBeat(internal, resolution as PerformRes, pause, clock, newPauseId);
+      next = resolvePerformBeat(internal, resolution as PerformRes, pause, clock, newPauseId, events);
+      break;
   }
+  appendTerminalEvents(next, events);
+  return withEvents(next, events);
 }
 
 // ── Phase 1 transitions ────────────────────────────────────────────
@@ -310,12 +376,18 @@ function resolveConfirmFit(
   internal: InternalState,
   res: ConfirmRes,
   nid: () => string,
+  events: MaestroEvent[],
 ): EngineState {
+  if (!internal.active) {
+    return failed("confirm-fit: no active pattern");
+  }
   if (res.ok) {
+    events.push({ kind: "pattern-confirmed", pattern: internal.active.patternName });
     return enterAfterConfirmFit(internal, nid);
   }
   // ok=false with reroute → fresh confirm-fit on the new pattern.
   if (res.reroute) {
+    events.push({ kind: "pattern-rerouted", from: internal.active.patternName, to: res.reroute });
     const target = findPattern(internal.patterns, res.reroute);
     if (!target) {
       return failed(`confirm-fit: reroute target '${res.reroute}' not registered`);
@@ -336,7 +408,9 @@ function resolveDraftRound(
   res: DraftRes,
   pause: Extract<Pause, { kind: "draft-pattern-round" }>,
   nid: () => string,
+  events: MaestroEvent[],
 ): EngineState {
+  events.push({ kind: "draft-round-completed", round: pause.payload.round, outcome: res.outcome });
   if (res.outcome === "approve") {
     if (!res.nextDraft) {
       return failed("draft-pattern-round: approve requires nextDraft");
@@ -375,6 +449,7 @@ function resolveElicitContext(
   internal: InternalState,
   res: ElicitRes,
   nid: () => string,
+  events: MaestroEvent[],
 ): EngineState {
   if (!internal.active) {
     return failed("elicit-context: no active pattern");
@@ -392,6 +467,8 @@ function resolveElicitContext(
     }
   }
   const missing = required.filter((k) => !merged[k]);
+  const filledKeys = required.filter((k) => !!merged[k]);
+  events.push({ kind: "context-collected", keys: filledKeys, missingKeys: missing });
   const next: InternalState = { ...internal, context: merged };
   if (missing.length > 0) {
     return runningPause(next, makeElicitPause(activePattern, merged, missing, nid));
@@ -404,6 +481,7 @@ function resolveGoGate(
   res: GoRes,
   clock: () => string,
   nid: () => string,
+  events: MaestroEvent[],
 ): EngineState {
   if (!internal.active) {
     return failed("go-gate: no active pattern");
@@ -443,6 +521,7 @@ function resolveGoGate(
   } catch (e) {
     return failed(`go-gate: compileScore failed: ${(e as Error).message}`);
   }
+  events.push({ kind: "score-compiled", scoreId: score.id, beatCount: score.beats.length });
   const seeded: InternalState = {
     ...internal,
     score,
@@ -460,6 +539,7 @@ function resolvePerformBeat(
   pause: Extract<Pause, { kind: "perform-beat" }>,
   clock: () => string,
   nid: () => string,
+  events: MaestroEvent[],
 ): EngineState {
   // Footnote-bug guard: validate voice output shape strictly before recording.
   const shapeError = validateVoiceOutputs(res.voiceOutputs, pause.payload.beat);
@@ -473,6 +553,12 @@ function resolvePerformBeat(
   if (!internal.score) {
     return failed("perform-beat: no compiled score");
   }
+  events.push({
+    kind: "beat-completed",
+    beatIndex: pause.payload.beatIndex,
+    verdictOutcome: res.verdict.outcome,
+    confidence: res.verdict.confidence,
+  });
 
   const performed: PerformedBeat = {
     beatIndex: pause.payload.beatIndex,
@@ -584,6 +670,7 @@ function resolveClassifyComplexity(
   internal: InternalState,
   res: ClassifyRes,
   nid: () => string,
+  events: MaestroEvent[],
 ): EngineState {
   if (![1, 2, 3, 4].includes(res.complexity)) {
     return failed(
@@ -593,6 +680,7 @@ function resolveClassifyComplexity(
   // classify-complexity is only emitted as a precursor to draft-pattern.
   // Routing happened outside the engine: the caller passed pattern="new"
   // to createEngine because no registered pattern fit the prompt.
+  events.push({ kind: "complexity-classified", complexity: res.complexity });
   return enterDraftPatternRound(internal, 1, res.complexity, undefined, nid);
 }
 

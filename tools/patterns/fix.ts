@@ -37,9 +37,9 @@ const score: PatternScore = {
     {
       step: "cover",
       level: 4,
-      instrument: "integrate",
+      instrument: "order",
       directive:
-        "Verify every applied fix has a covering regression test. For each bug listed in context.bug, confirm a test exists that (a) would fail without the fix and (b) passes with it. Write new tests for any fix that lacks coverage — do not rely on the reproduce-step tests alone if they were broad or indirect. Skip only when the reproduce tests already provide exact 1:1 coverage per fix.",
+        "Write a regression test for every applied fix that lacks one. For each bug listed in context.bug, confirm a test exists that (a) would fail without the fix and (b) passes with it. Do not rely on the reproduce-step tests alone if they were broad or indirect. Skip only when the reproduce tests already provide exact 1:1 coverage per fix.",
     },
     {
       step: "regress",

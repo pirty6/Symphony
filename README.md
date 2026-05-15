@@ -60,12 +60,12 @@ A skill tells the AI what _should_ happen. Symphony refuses to continue when it 
 ### Prerequisites
 
 - Node.js 20.x
-- npm (the repo uses `package-lock.json` for CI installs via `npm ci`; `yarn.lock` is also present for legacy reasons but npm is canonical)
+- Yarn (the repo uses `yarn.lock` for dependency resolution)
 
 ### Setup
 
 ```sh
-npm install
+yarn install
 ```
 
 The `prepare` script installs Husky's git hooks on first install.
@@ -75,9 +75,9 @@ The `prepare` script installs Husky's git hooks on first install.
 These three commands are the contract — CI and the `pre-push` hook run the same set:
 
 ```sh
-npm run lint        # oxlint
-npm run typecheck   # tsc -p tools/tsconfig.typecheck.json
-npm test            # jest --config tools/jest.config.js
+yarn lint         # oxlint
+yarn typecheck    # tsc -p tools/tsconfig.typecheck.json
+yarn test            # jest --config tools/jest.config.js
 ```
 
 ### Pre-push hook
@@ -108,7 +108,7 @@ Maestro runs as a VS Code Copilot Chat agent. The agent definitions live in `.gi
 
    ```sh
    git clone https://github.com/<org>/Symphony.git ~/Symphony
-   cd ~/Symphony && npm install
+   cd ~/Symphony && yarn install
    ```
 
 2. **Update the absolute path in `maestro.agent.md`.** Open `.github/agents/maestro.agent.md` and change the `SYMPHONY=` line to match where you cloned the repo:
@@ -117,7 +117,7 @@ Maestro runs as a VS Code Copilot Chat agent. The agent definitions live in `.gi
    SYMPHONY=/Users/<you>/Symphony
    ```
 
-   Every CLI invocation in the agent file uses this path, so it must be correct. Do the same for any hardcoded paths in the file (the `npx tsx ...` commands).
+   Every CLI invocation in the agent file uses this path, so it must be correct. Do the same for any hardcoded paths in the file (the `yarn tsx ...` commands).
 
 ### Per-workspace setup
 
@@ -152,5 +152,5 @@ Maestro will:
 ### Requirements
 
 - **VS Code** with GitHub Copilot Chat (agent mode must be enabled).
-- **Node.js 20+** — Symphony's CLIs run via `npx tsx`, which needs Node and the installed dependencies in the Symphony clone.
-- The Symphony repo must have its dependencies installed (`npm install`).
+- **Node.js 20+** — Symphony's CLIs run via `yarn tsx`, which needs Node and the installed dependencies in the Symphony clone.
+- The Symphony repo must have its dependencies installed (`yarn install`).

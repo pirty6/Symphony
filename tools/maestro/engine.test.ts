@@ -876,3 +876,312 @@ describe("planOnly + escalation", () => {
     expect(r2.payload.complexity).toBe(4);
   });
 });
+
+// ── MaestroEvent emission ──────────────────────────────────────────
+
+describe("MaestroEvent emission", () => {
+  test("createEngine emits run-started + pause-emitted for registered pattern", () => {
+    const result = createEngine({
+      prompt: "rename loadScore",
+      patterns: allPatterns,
+      pattern: "refactor",
+    });
+    expect(result.events).toBeDefined();
+    expect(result.events[0]).toEqual({
+      kind: "run-started",
+      prompt: "rename loadScore",
+      pattern: "refactor",
+    });
+    expect(result.events[1]).toEqual(
+      expect.objectContaining({ kind: "pause-emitted", pauseKind: "confirm-fit" }),
+    );
+    expect(result.events.length).toBe(2);
+  });
+
+  test("createEngine with pattern='new' emits run-started + pause-emitted(classify-complexity)", () => {
+    const result = createEngine({
+      prompt: "frobnicate",
+      patterns: allPatterns,
+      pattern: "new",
+    });
+    expect(result.events[0]).toEqual({ kind: "run-started", prompt: "frobnicate", pattern: "new" });
+    expect(result.events[1]).toEqual(
+      expect.objectContaining({ kind: "pause-emitted", pauseKind: "classify-complexity" }),
+    );
+  });
+
+  test("createEngine with unknown pattern emits run-started + run-failed", () => {
+    const result = createEngine({
+      prompt: "anything",
+      patterns: allPatterns,
+      pattern: "nonexistent",
+    });
+    expect(result.events[0].kind).toBe("run-started");
+    expect(result.events[1]).toEqual(
+      expect.objectContaining({ kind: "run-failed", error: expect.stringMatching(/not registered/) }),
+    );
+  });
+
+  test("confirm-fit ok=true emits pattern-confirmed + pause-emitted", () => {
+    const s0 = createEngine({ prompt: "rename", patterns: allPatterns, pattern: "refactor" });
+    const s1 = advance(s0, { kind: "confirm-fit", pauseId: pid(s0), ok: true });
+    expect(s1.events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "pattern-confirmed", pattern: "refactor" }),
+        expect.objectContaining({ kind: "pause-emitted", pauseKind: "elicit-context" }),
+      ]),
+    );
+  });
+
+  test("confirm-fit reroute emits pattern-rerouted + pause-emitted", () => {
+    const s0 = createEngine({ prompt: "rename", patterns: allPatterns, pattern: "refactor" });
+    const s1 = advance(s0, {
+      kind: "confirm-fit",
+      pauseId: pid(s0),
+      ok: false,
+      reroute: "investigate",
+    });
+    expect(s1.events).toEqual(
+      expect.arrayContaining([
+        { kind: "pattern-rerouted", from: "refactor", to: "investigate" },
+        expect.objectContaining({ kind: "pause-emitted", pauseKind: "confirm-fit" }),
+      ]),
+    );
+  });
+
+  test("classify-complexity emits complexity-classified + pause-emitted", () => {
+    const s0 = createEngine({ prompt: "frobnicate", patterns: allPatterns, pattern: "new" });
+    const s1 = advance(s0, { kind: "classify-complexity", pauseId: pid(s0), complexity: 3 });
+    expect(s1.events).toEqual(
+      expect.arrayContaining([
+        { kind: "complexity-classified", complexity: 3 },
+        expect.objectContaining({ kind: "pause-emitted", pauseKind: "draft-pattern-round" }),
+      ]),
+    );
+  });
+
+  test("elicit-context emits context-collected + pause-emitted", () => {
+    const s0 = createEngine({ prompt: "rename", patterns: allPatterns, pattern: "refactor" });
+    const s1 = advance(s0, { kind: "confirm-fit", pauseId: pid(s0), ok: true });
+    const s2 = advance(s1, {
+      kind: "elicit-context",
+      pauseId: pid(s1),
+      values: { target: "loadScore", invariant: "" },
+    });
+    const collected = s2.events.find((e) => e.kind === "context-collected");
+    expect(collected).toBeDefined();
+    if (collected && collected.kind === "context-collected") {
+      expect(collected.keys).toContain("target");
+      expect(collected.missingKeys).toContain("invariant");
+    }
+  });
+
+  test("go-gate with valid phrase emits score-compiled + beat-started + pause-emitted", () => {
+    let s = createEngine({ prompt: "rename", patterns: allPatterns, pattern: "refactor" });
+    s = advance(s, { kind: "confirm-fit", pauseId: pid(s), ok: true });
+    s = advance(s, {
+      kind: "elicit-context",
+      pauseId: pid(s),
+      values: { target: "loadScore", invariant: "type-check" },
+    });
+    const result = advance(s, { kind: "go-gate", pauseId: pid(s), phrase: "go" });
+    expect(result.events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "score-compiled" }),
+        expect.objectContaining({ kind: "beat-started", beatIndex: 0 }),
+        expect.objectContaining({ kind: "pause-emitted", pauseKind: "perform-beat" }),
+      ]),
+    );
+    const scoreEvent = result.events.find((e) => e.kind === "score-compiled");
+    if (scoreEvent && scoreEvent.kind === "score-compiled") {
+      expect(typeof scoreEvent.scoreId).toBe("string");
+      expect(scoreEvent.beatCount).toBeGreaterThan(0);
+    }
+  });
+
+  test("go-gate with vague phrase emits only pause-emitted (re-emitted go-gate)", () => {
+    let s = createEngine({ prompt: "rename", patterns: allPatterns, pattern: "refactor" });
+    s = advance(s, { kind: "confirm-fit", pauseId: pid(s), ok: true });
+    s = advance(s, {
+      kind: "elicit-context",
+      pauseId: pid(s),
+      values: { target: "loadScore", invariant: "type-check" },
+    });
+    const result = advance(s, { kind: "go-gate", pauseId: pid(s), phrase: "fine-ish" });
+    expect(result.events).toEqual([
+      expect.objectContaining({ kind: "pause-emitted", pauseKind: "go-gate" }),
+    ]);
+    // No score-compiled because the go-gate was rejected
+    expect(result.events.find((e) => e.kind === "score-compiled")).toBeUndefined();
+  });
+
+  test("perform-beat emits beat-completed + beat-started for next beat", () => {
+    let s = createEngine({ prompt: "understand", patterns: allPatterns, pattern: "investigate" });
+    s = advance(s, { kind: "confirm-fit", pauseId: pid(s), ok: true });
+    s = advance(s, { kind: "go-gate", pauseId: pid(s), phrase: "go" });
+    expectPause(s, "perform-beat");
+    const result = advance(s, {
+      kind: "perform-beat",
+      pauseId: pid(s),
+      voiceOutputs: [
+        { instrument: "order", output: "ok", confidence: 0.9, producedBy: "maestro-assessor" },
+      ],
+      verdict: { outcome: "applied", confidence: 0.9, reason: "ok", shouldTerminate: false },
+    });
+    expect(result.events).toEqual(
+      expect.arrayContaining([
+        { kind: "beat-completed", beatIndex: 0, verdictOutcome: "applied", confidence: 0.9 },
+        expect.objectContaining({ kind: "beat-started", beatIndex: 1 }),
+        expect.objectContaining({ kind: "pause-emitted", pauseKind: "perform-beat" }),
+      ]),
+    );
+  });
+
+  test("final beat emits beat-completed + run-completed (no beat-started)", () => {
+    const investigate = getPattern("investigate");
+    if (!investigate) {throw new Error("investigate pattern not found");}
+    const beats = investigate.score.beats.length;
+
+    let s = createEngine({ prompt: "understand", patterns: allPatterns, pattern: "investigate" });
+    s = advance(s, { kind: "confirm-fit", pauseId: pid(s), ok: true });
+    s = advance(s, { kind: "go-gate", pauseId: pid(s), phrase: "go" });
+
+    for (let i = 0; i < beats; i += 1) {
+      const pause = expectPause(s, "perform-beat");
+      s = advance(s, {
+        kind: "perform-beat",
+        pauseId: pid(s),
+        voiceOutputs: [
+          {
+            instrument: pause.payload.beat.voices[0].instrument,
+            output: `output ${i}`,
+            confidence: 0.85,
+            producedBy: "maestro-assessor",
+          },
+        ],
+        verdict: { outcome: "applied", confidence: 0.85, reason: "ok", shouldTerminate: false },
+      });
+    }
+    expect(s.kind).toBe("done");
+    expect(s.events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "beat-completed", beatIndex: beats - 1 }),
+        expect.objectContaining({ kind: "run-completed", outcome: "success" }),
+      ]),
+    );
+    expect(s.events.find((e) => e.kind === "beat-started")).toBeUndefined();
+  });
+
+  test("shouldTerminate=true emits beat-completed + run-completed", () => {
+    let s = createEngine({ prompt: "understand", patterns: allPatterns, pattern: "investigate" });
+    s = advance(s, { kind: "confirm-fit", pauseId: pid(s), ok: true });
+    s = advance(s, { kind: "go-gate", pauseId: pid(s), phrase: "go" });
+    const result = advance(s, {
+      kind: "perform-beat",
+      pauseId: pid(s),
+      voiceOutputs: [
+        { instrument: "order", output: "blocked", confidence: 0.2, producedBy: "maestro-assessor" },
+      ],
+      verdict: { outcome: "failed", confidence: 0.2, reason: "blocked", shouldTerminate: true },
+    });
+    expect(result.kind).toBe("done");
+    expect(result.events).toEqual(
+      expect.arrayContaining([
+        { kind: "beat-completed", beatIndex: 0, verdictOutcome: "failed", confidence: 0.2 },
+        expect.objectContaining({ kind: "run-completed", outcome: "failed" }),
+      ]),
+    );
+  });
+
+  test("validation failure emits run-failed", () => {
+    let s = createEngine({ prompt: "understand", patterns: allPatterns, pattern: "investigate" });
+    s = advance(s, { kind: "confirm-fit", pauseId: pid(s), ok: true });
+    s = advance(s, { kind: "go-gate", pauseId: pid(s), phrase: "go" });
+    const bad = {
+      kind: "perform-beat",
+      pauseId: pid(s),
+      voiceOutputs: [{ output: "x", confidence: 0.9 }],
+      verdict: { outcome: "applied", confidence: 0.9, reason: "ok", shouldTerminate: false },
+    } as unknown as Resolution;
+    const result = advance(s, bad);
+    expect(result.kind).toBe("failed");
+    expect(result.events).toEqual(
+      expect.arrayContaining([expect.objectContaining({ kind: "run-failed" })]),
+    );
+  });
+
+  test("pauseId mismatch emits run-failed", () => {
+    const s0 = createEngine({ prompt: "rename", patterns: allPatterns, pattern: "refactor" });
+    const result = advance(s0, { kind: "confirm-fit", pauseId: "wrong-id", ok: true });
+    expect(result.kind).toBe("failed");
+    expect(result.events).toEqual([
+      expect.objectContaining({ kind: "run-failed", error: expect.stringMatching(/pauseId mismatch/) }),
+    ]);
+  });
+
+  test("advance on non-running state returns empty events", () => {
+    const done = createEngine({ prompt: "x", patterns: allPatterns, pattern: "nonexistent" });
+    expect(done.kind).toBe("failed");
+    const result = advance(done, { kind: "confirm-fit", pauseId: "any", ok: true });
+    expect(result.events).toEqual([]);
+  });
+
+  test("planOnly go-gate emits run-planned (no score-compiled)", () => {
+    let s = createEngine({
+      prompt: "rename loadScore",
+      patterns: allPatterns,
+      pattern: "refactor",
+      planOnly: true,
+      outPath: "/tmp/plan.json",
+    } as unknown as Parameters<typeof createEngine>[0]);
+    s = advance(s, { kind: "confirm-fit", pauseId: pid(s), ok: true });
+    s = advance(s, {
+      kind: "elicit-context",
+      pauseId: pid(s),
+      values: { target: "loadScore", invariant: "type-check" },
+    });
+    const result = advance(s, { kind: "go-gate", pauseId: pid(s), phrase: "go" });
+    expect(result.kind).toBe("planned");
+    expect(result.events).toEqual([
+      expect.objectContaining({ kind: "run-planned", outPath: "/tmp/plan.json" }),
+    ]);
+    expect(result.events.find((e) => e.kind === "score-compiled")).toBeUndefined();
+  });
+
+  test("events are chronologically ordered within a single advance call", () => {
+    let s = createEngine({ prompt: "rename", patterns: allPatterns, pattern: "refactor" });
+    s = advance(s, { kind: "confirm-fit", pauseId: pid(s), ok: true });
+    s = advance(s, {
+      kind: "elicit-context",
+      pauseId: pid(s),
+      values: { target: "loadScore", invariant: "type-check" },
+    });
+    const result = advance(s, { kind: "go-gate", pauseId: pid(s), phrase: "go" });
+    const kinds = result.events.map((e) => e.kind);
+    // score-compiled should come before beat-started which comes before pause-emitted
+    const scoreIdx = kinds.indexOf("score-compiled");
+    const beatIdx = kinds.indexOf("beat-started");
+    const pauseIdx = kinds.indexOf("pause-emitted");
+    expect(scoreIdx).toBeLessThan(beatIdx);
+    expect(beatIdx).toBeLessThan(pauseIdx);
+  });
+
+  test("events survive JSON round-trip on AdvanceResult", () => {
+    const s0 = createEngine({ prompt: "rename", patterns: allPatterns, pattern: "refactor" });
+    const rt = JSON.parse(JSON.stringify(s0));
+    expect(rt.events).toBeDefined();
+    expect(rt.events[0].kind).toBe("run-started");
+  });
+
+  test("draft-round-completed event is emitted on draft-pattern resolution", () => {
+    let s = createEngine({ prompt: "frobnicate", patterns: allPatterns, pattern: "new" });
+    s = advance(s, { kind: "classify-complexity", pauseId: pid(s), complexity: 2 });
+    const result = advance(s, { kind: "draft-pattern-round", pauseId: pid(s), outcome: "edit" });
+    expect(result.events).toEqual(
+      expect.arrayContaining([
+        { kind: "draft-round-completed", round: 1, outcome: "edit" },
+        expect.objectContaining({ kind: "pause-emitted", pauseKind: "draft-pattern-round" }),
+      ]),
+    );
+  });
+});
