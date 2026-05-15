@@ -18,12 +18,12 @@ Symphony and Maestro are this repo's answer: **separate the planning from the do
 
 A Pattern is a pre-built Score template. The repo ships four:
 
-| Pattern         | Domain        | Required context         | Beats                                                                    |
-| --------------- | ------------- | ------------------------ | ------------------------------------------------------------------------ |
-| **`feature`**   | feature       | `scope`, `contract`      | frame → test → sketch → implement → cover → verify → lint               |
-| **`refactor`**  | refactor      | `target`, `invariant`    | frame → survey → plan → execute → verify → document → lint → prune      |
-| **`fix`**       | fix           | `bug`, `reproduction`    | reproduce → diagnose → fix → cover → regress → document → lint          |
-| **`investigate`** | investigate | _(none)_                 | clarify → scope → map → hypothesize → answer → recommend                |
+| Pattern           | Domain      | Required context      | Beats                                                              |
+| ----------------- | ----------- | --------------------- | ------------------------------------------------------------------ |
+| **`feature`**     | feature     | `scope`, `contract`   | frame → test → sketch → implement → cover → verify → lint          |
+| **`refactor`**    | refactor    | `target`, `invariant` | frame → survey → plan → execute → verify → document → lint → prune |
+| **`fix`**         | fix         | `bug`, `reproduction` | reproduce → diagnose → fix → cover → regress → document → lint     |
+| **`investigate`** | investigate | _(none)_              | clarify → scope → map → hypothesize → answer → recommend           |
 
 Each Pattern is a list of beats in a specific order. Each beat has a directive (what to do), a level (abstraction tier, 1–8), and voices with instrument types (`analyze`, `decide`, `question`, `order`, `integrate`). These Patterns were _pre-debated_ — the right beat sequence was argued once, saved, and now every run follows the same proven script.
 
@@ -40,6 +40,7 @@ You type something like _"refactor the prompts to use fewer tokens"_. Then:
    - **Executor** — write-only. Applies file edits as instructed.
 
    The engine validates each AI's response shape (right fields, valid confidence number, valid outcome). Malformed responses are rejected.
+
 6. **Done.** A `Performance` JSON file records what every beat did. You can re-verify or replay it later.
 
 ## Architecture
