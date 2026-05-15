@@ -3,6 +3,8 @@ import * as path from "node:path";
 import * as crypto from "node:crypto";
 import { composerPromptFor, instrumentPromptFor } from "./prompts";
 import type { EngineState } from "./types/engine";
+import { saveRun } from "../symphony/persistence";
+import type { SavedRun } from "../symphony/types";
 
 /**
  * Returns the current wall-clock time as an ISO-8601 string.
@@ -71,6 +73,24 @@ export function emitDoneAndExit(state: EngineState): void {
     process.stderr.write(`expected done state; got ${state.kind}\n`);
     process.exit(1);
   }
+
+  // Auto-save the completed run to the score store
+  const { executableScore, performance, patternScore } = state.result;
+  const run: SavedRun = {
+    schemaVersion: 1,
+    patternScore,
+    executableScore,
+    performance,
+    problemFingerprint: executableScore.generatedFrom.canonicalHash,
+    timestamp: executableScore.generatedAt,
+  };
+  try {
+    const file = saveRun(run);
+    process.stderr.write(`saved: ${file}\n`);
+  } catch (err) {
+    process.stderr.write(`warning: could not auto-save run: ${(err as Error).message}\n`);
+  }
+
   process.stdout.write(
     JSON.stringify(
       {

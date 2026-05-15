@@ -733,6 +733,13 @@ function finishRun(
   if (!internal.score) {
     return failed("finish-run: no compiled score");
   }
+  if (!internal.active) {
+    return failed("finish-run: no active pattern");
+  }
+  const activePattern = findPattern(internal.patterns, internal.active.patternName);
+  if (!activePattern) {
+    return failed("finish-run: active pattern not registered");
+  }
   const performance: Performance = {
     scoreId: internal.score.id,
     beats: internal.performedBeats,
@@ -742,7 +749,7 @@ function finishRun(
   };
   return {
     kind: "done",
-    result: { executableScore: internal.score, performance },
+    result: { executableScore: internal.score, performance, patternScore: activePattern.score },
   };
 }
 

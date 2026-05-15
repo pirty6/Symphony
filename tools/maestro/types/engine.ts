@@ -1,4 +1,4 @@
-import type { Pattern } from "../../patterns";
+import type { Pattern, PatternScore } from "../../patterns";
 import type { AlgorithmInput } from "../../compiler/compile";
 import type { ExecutableScore, Performance, PerformedBeat } from "../../symphony/types";
 import type { Pause } from "./pause";
@@ -38,6 +38,8 @@ export interface EngineConfig {
 export interface EngineResult {
   readonly executableScore: ExecutableScore;
   readonly performance: Performance;
+  /** Snapshot of the pattern skeleton used to compile the score. */
+  readonly patternScore: PatternScore;
 }
 
 export interface InternalState {
