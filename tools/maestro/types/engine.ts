@@ -2,6 +2,7 @@ import type { Pattern } from "../../patterns";
 import type { AlgorithmInput } from "../../compiler/compile";
 import type { ExecutableScore, Performance, PerformedBeat } from "../../symphony/types";
 import type { Pause } from "./pause";
+import type { MaestroEvent } from "./event";
 
 export interface EngineConfig {
   readonly prompt: string;
@@ -97,5 +98,16 @@ type FailedState = EngineStateBase & {
   readonly kind: Failed;
   readonly error: string;
 };
+
+/**
+ * Return type of `createEngine()` and `advance()`. The engine state is
+ * augmented with the events emitted during the transition. Events are
+ * return values, not side effects — the engine remains pure.
+ *
+ * The intersection preserves discriminated-union narrowing on `kind`:
+ * existing code that checks `result.kind === "running"` continues to
+ * work and gains access to `result.events`.
+ */
+export type AdvanceResult = EngineState & { readonly events: readonly MaestroEvent[] };
 
 export type EngineState = RunningState | DoneState | PlannedState | FailedState;

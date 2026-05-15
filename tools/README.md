@@ -30,9 +30,9 @@ The curated library of algorithms. Each pattern is a TypeScript module exporting
 Directives are static prose colocated with the beat. Repo-specific knobs travel through `context`, not via interpolation. List the library or render a single pattern as Markdown with:
 
 ```bash
-npx tsx tools/symphony/cli.ts list-patterns
-npx tsx tools/symphony/cli.ts pattern view --pattern investigate
-npx tsx tools/symphony/cli.ts pattern view --pattern refactor --out /tmp/refactor.md
+yarn tsx tools/symphony/cli.ts list-patterns
+yarn tsx tools/symphony/cli.ts pattern view --pattern investigate
+yarn tsx tools/symphony/cli.ts pattern view --pattern refactor --out /tmp/refactor.md
 ```
 
 The `.ts` module is the source of truth; `pattern view` regenerates a human-readable Markdown view on demand. There is no `.md → .ts` parser — round-trip is one-way.
@@ -60,32 +60,32 @@ The runtime: types, persistence, beat legality, and the CLI.
 
 ```bash
 # Compile an ExecutableScore from a pattern + problem + context
-npx tsx tools/symphony/cli.ts from-pattern \
+yarn tsx tools/symphony/cli.ts from-pattern \
   --pattern <name> \
   --input   <input.json>     # { problem: string, context?: object }
   --out     <score.json>
 
 # Build an ExecutableScore from a hand-authored algorithm (fallback)
-npx tsx tools/symphony/cli.ts parse --input <a.json> --out <s.json>
+yarn tsx tools/symphony/cli.ts parse --input <a.json> --out <s.json>
 
 # Generate a skeleton Performance for an existing ExecutableScore
-npx tsx tools/symphony/cli.ts scaffold-performance --score <s.json> --out <p.json>
+yarn tsx tools/symphony/cli.ts scaffold-performance --score <s.json> --out <p.json>
 
 # Persist a SavedRun (snapshot pattern + executable score + performance)
-npx tsx tools/symphony/cli.ts save-run \
+yarn tsx tools/symphony/cli.ts save-run \
   --pattern     <name> \
   --score       <score.json> \
   --performance <performance.json>
 
 # Verify a SavedRun by file
-npx tsx tools/symphony/cli.ts verify --file <tools/scores/store/.../*.json>
+yarn tsx tools/symphony/cli.ts verify --file <tools/scores/store/.../*.json>
 
 # Rebuild the score library index (pattern + outcome lookup)
-npx tsx tools/symphony/cli.ts library-index
+yarn tsx tools/symphony/cli.ts library-index
 
 # Patterns
-npx tsx tools/symphony/cli.ts list-patterns
-npx tsx tools/symphony/cli.ts pattern view --pattern <name>
+yarn tsx tools/symphony/cli.ts list-patterns
+yarn tsx tools/symphony/cli.ts pattern view --pattern <name>
 ```
 
 ## tools/scores/
@@ -119,8 +119,8 @@ Each SavedRun JSON wraps three things:
 ## Build / verify
 
 ```bash
-npm test                      # full jest suite
-npm run typecheck             # strict TS check across tools/
+yarn test                      # full jest suite
+yarn typecheck             # strict TS check across tools/
 ```
 
 No build step is required at runtime — everything runs through `tsx`.

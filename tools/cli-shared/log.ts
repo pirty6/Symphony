@@ -7,7 +7,7 @@
  *
  * Logging is opt-in via the `SYMPHONY_LOG` environment variable:
  *
- *   SYMPHONY_LOG=/tmp/symphony.log npx tsx tools/maestro/cli.ts ...
+ *   SYMPHONY_LOG=/tmp/symphony.log yarn tsx tools/maestro/cli.ts ...
  *
  * If `SYMPHONY_LOG` is unset or empty, `appendLog` is a no-op. There
  * is no CLI flag — telemetry is a session-level decision, set once.

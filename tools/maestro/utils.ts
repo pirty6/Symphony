@@ -125,8 +125,10 @@ export function emitPlannedAndExit(state: EngineState, outPath: string): void {
  */
 export function writeState(file: string, state: EngineState): void {
   fs.mkdirSync(path.dirname(file), { recursive: true });
+  // Strip transient `events` array (present on AdvanceResult, not part of durable state).
+  const { events: _events, ...persistent } = state as EngineState & { events?: unknown };
   // JSON.stringify(value, replacer=undefined → all keys, space=2 → pretty-print)
-  fs.writeFileSync(file, JSON.stringify(state, undefined, 2) + "\n", "utf8");
+  fs.writeFileSync(file, JSON.stringify(persistent, undefined, 2) + "\n", "utf8");
 }
 
 /**

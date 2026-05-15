@@ -1,6 +1,6 @@
 ---
 name: maestro
-description: "Resolve a well-defined problem by routing it to a Pattern, eliciting concrete repo-specific context from the user, then compiling and executing the resulting Score. The default path runs no debate — patterns are pre-debated artifacts. A multi-agent debate fires only when no pattern exists for the user's verb (draft-pattern path) or when the user disputes the pattern's shape. Triggers on: fix this, resolve, debug, refactor, add feature, investigate. DOES NOT APPLY TO: pure research with no success condition."
+description: "Resolve a well-defined problem by routing it to a Pattern, eliciting concrete repo-specific context from the user, then compiling and executing the resulting Score. The default path runs no debate — patterns are pre-debated artifacts. A multi-agent debate fires only when no pattern exists for the user's verb (draft-pattern path) or when the user disputes the pattern's shape."
 tools: [execute, read, agent, todo]
 agents:
   [
@@ -44,16 +44,16 @@ before `start`:
 
 ```bash
 # 1. List patterns: { pattern, domain, description, requiredContext, beats }.
-npx tsx /Users/perezgarciam/Documents/git/Symphony/tools/patterns/cli.ts list --json
+yarn tsx /Users/perezgarciam/Documents/git/Symphony/tools/patterns/cli.ts list --json
 
 # 2. Start the run. Writes opaque state; exits 2 with first Pause.
-npx tsx /Users/perezgarciam/Documents/git/Symphony/tools/maestro/cli.ts start \
+yarn tsx /Users/perezgarciam/Documents/git/Symphony/tools/maestro/cli.ts start \
   --prompt  "<user's original prompt>" \
   --pattern "<chosen-name|new>" \
   --state   /tmp/<slug>.state.json
 
 # 3. Apply each Resolution. Exit 2 = next Pause; 0 = done; 1 = failed.
-npx tsx /Users/perezgarciam/Documents/git/Symphony/tools/maestro/cli.ts resolve \
+yarn tsx /Users/perezgarciam/Documents/git/Symphony/tools/maestro/cli.ts resolve \
   --state      /tmp/<slug>.state.json \
   --resolution '<json>'
 ```
@@ -64,7 +64,7 @@ instrumentPrompt }`. The `kind` determines the Resolution shape.
 ### Subprocess failure is a hard stop
 
 Any subprocess (`maestro/cli.ts`, `symphony/cli.ts`, spawned subagents,
-`npx tsx` itself) exiting non-zero means: surface exit code + stderr
+`yarn tsx` itself) exiting non-zero means: surface exit code + stderr
 verbatim, stop, let the user decide. Do not retry, reformulate, or
 diagnose. Only exit `2` means "continue the loop"; `0` means done.
 
@@ -245,12 +245,12 @@ When the engine reaches `done`, stdout is `{ status, executableScore,
 performance }`. Persist with Symphony tooling:
 
 ```bash
-npx tsx /Users/perezgarciam/Documents/git/Symphony/tools/symphony/cli.ts save-run \
+yarn tsx /Users/perezgarciam/Documents/git/Symphony/tools/symphony/cli.ts save-run \
   --pattern     <name> \
   --score       <executableScore-as-file> \
   --performance <performance-as-file>
 
-npx tsx /Users/perezgarciam/Documents/git/Symphony/tools/symphony/cli.ts verify --file <returned-path>
+yarn tsx /Users/perezgarciam/Documents/git/Symphony/tools/symphony/cli.ts verify --file <returned-path>
 ```
 
 ---
