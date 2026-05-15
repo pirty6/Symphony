@@ -21,11 +21,17 @@ const $rightPanel  = document.getElementById("right-panel");
 const $watchToggle = document.getElementById("watch-toggle");
 const $exportBtn   = document.getElementById("export-btn");
 const $toast       = document.getElementById("toast");
+const $promptBanner = document.getElementById("prompt-banner");
+
+const $library       = document.getElementById("library");
+const $libraryList   = document.getElementById("library-list");
+const $librarySearch = document.getElementById("library-search");
 
 let currentData  = undefined;
 let currentType  = undefined; // "engine-state" | "executable-score" | "saved-run"
 let fileHandle   = undefined;
 let watchTimer   = undefined;
+let manifest     = [];
 
 // ─── File Type Detection ───────────────────────────────────────────
 function detectFileType(data) {
@@ -127,6 +133,7 @@ $backBtn.addEventListener("click", () => {
   stopWatching();
   $watchToggle.checked = false;
   fileHandle = undefined;
+  if ($promptBanner) $promptBanner.classList.add("hidden");
   $viewer.classList.remove("visible");
   $dropZone.classList.remove("hidden");
 });
@@ -223,6 +230,15 @@ function formatTime(iso) {
   } catch { return iso; }
 }
 
+function friendlyDate(iso) {
+  if (!iso) {return "";}
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) {return iso;}
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  } catch { return iso; }
+}
+
 function elapsed(startIso, endIso) {
   if (!startIso) {return "";}
   const start = new Date(startIso).getTime();
@@ -251,6 +267,38 @@ function renderKVTable(obj) {
   return html;
 }
 
+
+// ─── Prompt Extraction ─────────────────────────────────────────────
+// The user's original prompt is only preserved verbatim in EngineState
+// internal.prompt. ExecutableScore and SavedRun do NOT store the raw
+// prompt — it is hashed into generatedFrom.rawHash by fingerprintProblem().
+// Context fields (problem, target, scope) are pattern-specific repo context,
+// NOT the user's original prompt.
+function extractOriginalPrompt(data, type) {
+  if (type === "engine-state") {
+    // "running" state preserves internal.prompt
+    if (data.kind === "running") return data.internal?.prompt ?? "";
+    // "done" state drops internal — prompt is not available
+    if (data.kind === "done") return "";
+    if (data.kind === "planned") return data.algorithm?.prompt ?? "";
+    return "";
+  }
+  // SavedRun and ExecutableScore do not store the raw prompt.
+  // The prompt was consumed by fingerprintProblem() at compile time.
+  return "";
+}
+
+function showPromptBanner(promptText) {
+  if (!promptText || !$promptBanner) {
+    if ($promptBanner) $promptBanner.classList.add("hidden");
+    return;
+  }
+  $promptBanner.classList.remove("hidden");
+  $promptBanner.innerHTML =
+    '<div class="prompt-banner-label">Original Prompt</div>' +
+    '<div class="prompt-banner-text">' + esc(promptText) + '</div>';
+}
+
 // ─── Main Load Orchestrator ────────────────────────────────────────
 function loadData(data, isRefresh) {
   const type = detectFileType(data);
@@ -270,6 +318,9 @@ function loadData(data, isRefresh) {
   } else if (type === "saved-run") {
     renderSavedRun(data);
   }
+
+  // Show original prompt banner (only available for running engine state)
+  showPromptBanner(extractOriginalPrompt(data, type));
 
   if (!isRefresh) {
     const labels = { "engine-state": "Engine State", "executable-score": "ExecutableScore", "saved-run": "SavedRun" };
@@ -571,6 +622,16 @@ function renderPatternScorePanel(patternScore) {
 // SHARED RENDERING COMPONENTS
 // ════════════════════════════════════════════════════════════════════
 
+function agentIcon(producedBy) {
+  if (producedBy === "maestro-assessor") return "\u{1F50D}";
+  if (producedBy === "maestro-executor") return "\u{270F}\u{FE0F}";
+  if (producedBy === "maestro-proposer") return "\u{1F4DD}";
+  if (producedBy === "maestro-skeptic") return "\u{1F9D0}";
+  if (producedBy === "maestro-pragmatist") return "\u{2696}\u{FE0F}";
+  if (producedBy === "maestro-template-critic") return "\u{1F3AF}";
+  return "\u{26A1}";
+}
+
 function renderBeatFlow(scoreBeats, perfMap, activeBeatIdx) {
   let html = `<div class="beat-flow">`;
 
@@ -599,24 +660,48 @@ function renderBeatFlow(scoreBeats, perfMap, activeBeatIdx) {
 
     html += `<div class="beat-directive">${esc(beat.directive ?? "")}</div>`;
 
-    // Performed voices
-    if (perf && perf.voices) {
+    // Performed voices — show as sub-agent branch nodes
+    if (perf && perf.voices && perf.voices.length > 0) {
+      const multiVoice = perf.voices.length > 1;
+      html += `<div class="subagent-branches${multiVoice ? " multi" : ""}">`;
       perf.voices.forEach((voice, vi) => {
         const voiceId = `voice-${idx}-${vi}`;
         const full = voice.output ?? "";
-        html += `<div class="voice-block">`;
+        const agentName = voice.producedBy || "unknown";
+        const shortAgent = agentName.replace("maestro-", "");
+        const agentClass = agentName === "maestro-assessor" ? "agent-assessor"
+          : agentName === "maestro-executor" ? "agent-executor" : "agent-other";
+        const confPct = Math.round((voice.confidence ?? 0) * 100);
+
+        html += `<div class="subagent-branch">`;
+        html += `<div class="subagent-connector-line"></div>`;
+        html += `<div class="subagent-node ${agentClass}">`;
+
+        // Agent header
+        html += `<div class="subagent-header">`;
+        html += `<span class="subagent-icon">${agentIcon(agentName)}</span>`;
+        html += `<span class="subagent-name">${esc(shortAgent)}</span>`;
+        html += `<span class="subagent-instrument">${esc(voice.instrument)}</span>`;
+        html += `<span class="subagent-conf">${confPct}%</span>`;
+        html += `</div>`;
+
+        // Collapsible output
         html += `<div class="voice-header" onclick="toggleVoice('${voiceId}')" role="button" tabindex="0" aria-expanded="false" aria-controls="${voiceId}-output">`;
-        html += `<span class="arrow" id="${voiceId}-arrow">▶</span>`;
-        html += `<span>${esc(voice.instrument)}</span>`;
-        if (voice.producedBy) {html += `<span class="voice-produced-by">${esc(voice.producedBy)}</span>`;}
+        html += `<span class="arrow" id="${voiceId}-arrow">\u25B6</span>`;
+        html += `<span>Output (${full.length} chars)</span>`;
         html += `</div>`;
         html += `<div class="voice-output" id="${voiceId}-output">${esc(full)}</div>`;
+
+        // Confidence bar
         html += `<div class="confidence-bar-wrap">`;
-        html += `<div class="confidence-bar"><div class="confidence-bar-fill" style="width:${Math.round((voice.confidence ?? 0) * 100)}%"></div></div>`;
-        html += `<span class="confidence-label">${Math.round((voice.confidence ?? 0) * 100)}%</span>`;
+        html += `<div class="confidence-bar"><div class="confidence-bar-fill" style="width:${confPct}%"></div></div>`;
+        html += `<span class="confidence-label">${confPct}%</span>`;
         html += `</div>`;
-        html += `</div>`;
+
+        html += `</div>`; // .subagent-node
+        html += `</div>`; // .subagent-branch
       });
+      html += `</div>`; // .subagent-branches
     }
 
     // Verdict
@@ -858,3 +943,117 @@ window.toggleVoice = function(voiceId) {
   const header = arrow.closest(".voice-header");
   if (header) {header.setAttribute("aria-expanded", String(isOpen));}
 };
+
+// ════════════════════════════════════════════════════════════════════
+// LIBRARY — auto-load manifest when served via dev server
+// ════════════════════════════════════════════════════════════════════
+
+async function tryLoadManifest() {
+  try {
+    const res = await fetch("/api/manifest");
+    if (!res.ok) { return; }
+    manifest = await res.json();
+    if (!Array.isArray(manifest) || manifest.length === 0) { return; }
+    showLibrary();
+  } catch {
+    // Not served via dev server — library stays hidden
+  }
+}
+
+function showLibrary() {
+  $library.classList.remove("hidden");
+  $dropZone.classList.add("has-library");
+  renderLibrary(manifest);
+}
+
+function renderLibrary(entries) {
+  if (!entries.length) {
+    $libraryList.innerHTML = '<div class="library-empty">No saved runs found</div>';
+    return;
+  }
+
+  const groups = {};
+  for (const entry of entries) {
+    const groupKey = entry.category === "run"
+      ? "Runs — " + entry.pattern
+      : entry.category === "baseline"
+        ? "Baselines"
+        : "Fixtures";
+    if (!groups[groupKey]) { groups[groupKey] = []; }
+    groups[groupKey].push(entry);
+  }
+
+  let html = "";
+  for (const [groupName, items] of Object.entries(groups)) {
+    html += '<div class="library-group">';
+    html += '<div class="library-group-header">' + esc(groupName) + ' <span class="library-group-count">(' + items.length + ')</span></div>';
+    for (const item of items) {
+      const promptSnippet = item.prompt ? truncate(item.prompt, 60) : "";
+      const dateStr = item.timestamp ? friendlyDate(item.timestamp) : "";
+      const typeLabel = item.category === "run" ? "saved run" : item.category;
+      const outcomeClass = item.outcome === "success" ? "applied"
+        : item.outcome === "failed" ? "failed"
+        : item.outcome === "partial" ? "skipped" : "";
+
+      html += '<div class="library-item" data-path="' + esc(item.path) + '" role="button" tabindex="0" title="' + esc(item.filename) + '">';
+      html += '<div class="library-item-main">';
+      if (promptSnippet) {
+        html += '<div class="library-item-prompt">' + esc(promptSnippet) + '</div>';
+      } else {
+        html += '<div class="library-item-name">' + esc(item.filename.replace(".json", "")) + '</div>';
+      }
+      if (dateStr) { html += '<div class="library-item-time">' + esc(dateStr) + '</div>'; }
+      html += '</div>';
+      html += '<div class="library-item-badges">';
+      if (item.outcome) {
+        html += '<span class="library-item-outcome ' + outcomeClass + '">' + esc(item.outcome) + '</span>';
+      }
+      if (item.beatCount != null) {
+        html += '<span class="library-item-beats">' + item.beatCount + ' beats</span>';
+      }
+      html += '<span class="library-item-type">' + esc(typeLabel) + '</span>';
+      html += '</div>';
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+  $libraryList.innerHTML = html;
+
+  $libraryList.querySelectorAll(".library-item").forEach(el => {
+    el.addEventListener("click", () => loadFromLibrary(el.dataset.path));
+    el.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); loadFromLibrary(el.dataset.path); }
+    });
+  });
+}
+
+async function loadFromLibrary(path) {
+  try {
+    const res = await fetch(path);
+    if (!res.ok) { showToast("Failed to load: " + res.statusText); return; }
+    const data = await res.json();
+    loadData(data);
+  } catch (err) {
+    showToast("Error loading file: " + err.message);
+  }
+}
+
+if ($librarySearch) {
+  $librarySearch.addEventListener("input", () => {
+    const query = $librarySearch.value.toLowerCase().trim();
+    if (!query) {
+      renderLibrary(manifest);
+      return;
+    }
+    const filtered = manifest.filter(e =>
+      e.filename.toLowerCase().includes(query) ||
+      (e.pattern ?? "").toLowerCase().includes(query) ||
+      e.category.toLowerCase().includes(query) ||
+      (e.prompt ?? "").toLowerCase().includes(query) ||
+      (e.outcome ?? "").toLowerCase().includes(query)
+    );
+    renderLibrary(filtered);
+  });
+}
+
+tryLoadManifest();

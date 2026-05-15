@@ -9,28 +9,39 @@
   <body>
     <!-- ═══ Drop Zone ═══════════════════════════════════════════════════ -->
     <div id="drop-zone" role="main" aria-label="File loading area">
-      <div
-        class="drop-area"
-        id="drop-area"
-        role="button"
-        tabindex="0"
-        aria-label="Drop a JSON file here or click to browse"
-      >
-        <h2>Maestro Run Viewer</h2>
-        <p>
-          Drop a <code>.state.json</code>, <code>ExecutableScore</code>, or
-          <code>SavedRun</code> file here, or click to browse
-        </p>
-        <input type="file" id="file-input" accept=".json" aria-label="Select JSON file" />
+      <!-- Library (auto-populated when served) -->
+      <div id="library" class="library hidden" role="region" aria-label="Run library">
+        <h2>Run Library</h2>
+        <div class="library-controls">
+          <input type="text" id="library-search" placeholder="Filter runs…" aria-label="Filter runs" />
+        </div>
+        <div id="library-list" class="library-list"></div>
       </div>
-      <span class="or-divider">or paste JSON</span>
-      <div class="paste-area">
-        <textarea
-          id="paste-input"
-          placeholder="Paste JSON here…"
-          aria-label="Paste JSON"
-        ></textarea>
-        <button class="btn btn-primary" id="paste-btn">Load JSON</button>
+
+      <div class="import-section" id="import-section">
+        <div
+          class="drop-area"
+          id="drop-area"
+          role="button"
+          tabindex="0"
+          aria-label="Drop a JSON file here or click to browse"
+        >
+          <h2>Maestro Run Viewer</h2>
+          <p>
+            Drop a <code>.state.json</code>, <code>ExecutableScore</code>, or
+            <code>SavedRun</code> file here, or click to browse
+          </p>
+          <input type="file" id="file-input" accept=".json" aria-label="Select JSON file" />
+        </div>
+        <span class="or-divider">or paste JSON</span>
+        <div class="paste-area">
+          <textarea
+            id="paste-input"
+            placeholder="Paste JSON here…"
+            aria-label="Paste JSON"
+          ></textarea>
+          <button class="btn btn-primary" id="paste-btn">Load JSON</button>
+        </div>
       </div>
     </div>
 
@@ -52,7 +63,7 @@
         </div>
         <div class="header-timing" id="header-timing"></div>
         <div class="header-actions">
-          <div class="toggle-wrap">
+          <div class="toggle-wrap" title="Auto-refreshes every 2 seconds to monitor a live run's state file as it updates">
             <span>Watch</span>
             <label class="toggle" aria-label="Toggle auto-refresh">
               <input type="checkbox" id="watch-toggle" />
@@ -68,7 +79,10 @@
       <!-- Phase Stepper -->
       <nav class="phase-stepper" id="phase-stepper" aria-label="Run phase progress"></nav>
 
-      <!-- Main Content -->
+      <!-- Prompt Banner -->
+        <div id="prompt-banner" class="prompt-banner hidden" role="region" aria-label="Original prompt"></div>
+
+        <!-- Main Content -->
       <div class="main-content">
         <section class="left-panel" id="left-panel" aria-label="Beat sequence"></section>
         <aside class="right-panel" id="right-panel" aria-label="Details panel"></aside>

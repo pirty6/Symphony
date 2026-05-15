@@ -21,7 +21,8 @@
     "fmt:check": "oxfmt --check",
     "test": "jest --config tools/jest.config.js",
     "typecheck": "tsc -p tools/tsconfig.typecheck.json",
-    "prepare": "husky"
+    "prepare": "husky",
+    "viewer": "tsx tools/maestro/serve.ts"
   },
   "dependencies": {
     "yargs": "^18.0.0"
