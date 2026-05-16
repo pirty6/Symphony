@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import { saveRun } from "./persistence";
-import type { SavedRun, PatternScore } from "./types";
+import type { SavedRun } from "./types";
+import type { PatternScore } from "../patterns/types";
 
 try {
   const raw = fs.readFileSync("/tmp/update-package-fix.state.json", "utf8");

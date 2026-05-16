@@ -121,7 +121,9 @@ describe("saveRun → loadRun round-trip", () => {
     const file = saveRun(run, tmp);
     const data = JSON.parse(fs.readFileSync(file, "utf8")) as SavedRun;
     const beats = [...data.performance.beats];
-    if (beats.length < 2) {return;} // not exercising on degenerate runs
+    if (beats.length < 2) {
+      return;
+    } // not exercising on degenerate runs
     const swappedPerformance: Performance = {
       ...data.performance,
       beats: [beats[1], beats[0], ...beats.slice(2)],
