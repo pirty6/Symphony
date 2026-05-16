@@ -20,7 +20,7 @@ import {
 } from "./persistence";
 import { compileScore } from "../compiler/compile";
 import { scaffoldPerformance } from "./perform";
-import { investigatePattern, refactorPattern } from "../patterns";
+import { investigatePattern, refactorPattern, fixPattern } from "../patterns";
 import { buildLibraryIndex } from "../scores/library";
 import type { Performance, SavedRun } from "./types";
 
@@ -34,11 +34,17 @@ function buildSavedRun(pattern = investigatePattern): SavedRun {
   const score =
     pattern === investigatePattern
       ? compileScore(pattern, { problem: "p", generatedAt: FIXED_TS })
-      : compileScore(pattern, {
-          problem: "p",
-          context: { target: "t", invariant: "i" },
-          generatedAt: FIXED_TS,
-        });
+      : pattern === fixPattern
+        ? compileScore(pattern, {
+            problem: "p",
+            context: { bug: "b", reproduction: "r" },
+            generatedAt: FIXED_TS,
+          })
+        : compileScore(pattern, {
+            problem: "p",
+            context: { target: "t", invariant: "i" },
+            generatedAt: FIXED_TS,
+          });
   const performance = scaffoldPerformance(score);
   return {
     schemaVersion: 1,
@@ -151,6 +157,25 @@ describe("loadExecutableScore / loadPerformance", () => {
     const performance = loadPerformance(perfFile);
     expect(score.id).toBe(run.executableScore.id);
     expect(performance.scoreId).toBe(run.executableScore.id);
+  });
+});
+
+describe("saveRun tolerates missing patternScore", () => {
+  test("saveRun tolerates missing patternScore by deriving pattern from executableScore", () => {
+    const tmp = makeTmpDir();
+    const run = buildSavedRun(fixPattern);
+    // Simulate engine emitting a SavedRun where patternScore is undefined
+    const runWithoutPatternScore = {
+      ...run,
+      patternScore: undefined,
+    } as unknown as SavedRun;
+
+    expect(() => saveRun(runWithoutPatternScore, tmp)).not.toThrow();
+
+    // Should derive folder name from executableScore.pattern ("fix")
+    const patternDir = path.join(tmp, "fix");
+    expect(fs.existsSync(patternDir)).toBe(true);
+    expect(fs.readdirSync(patternDir).length).toBe(1);
   });
 });
 

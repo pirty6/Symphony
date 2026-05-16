@@ -5,6 +5,7 @@ import { composerPromptFor, instrumentPromptFor } from "./prompts";
 import type { EngineState } from "./types/engine";
 import { saveRun } from "../symphony/persistence";
 import type { SavedRun } from "../symphony/types";
+import { getPattern } from "../patterns";
 
 /**
  * Returns the current wall-clock time as an ISO-8601 string.
@@ -76,9 +77,14 @@ export function emitDoneAndExit(state: EngineState): void {
 
   // Auto-save the completed run to the score store
   const { executableScore, performance, patternScore } = state.result;
+  const resolvedPatternScore = patternScore ?? (executableScore.pattern ? getPattern(executableScore.pattern)?.score : undefined) ?? {
+    pattern: executableScore.pattern,
+    domain: executableScore.frequencyMap.key,
+    beats: [],
+  };
   const run: SavedRun = {
     schemaVersion: 1,
-    patternScore,
+    patternScore: resolvedPatternScore,
     executableScore,
     performance,
     problemFingerprint: executableScore.generatedFrom.canonicalHash,

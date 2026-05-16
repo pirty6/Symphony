@@ -105,7 +105,7 @@ function safeTimestampSlug(timestamp: string): string {
  * to disambiguate manually-listed files without bloating the path.
  */
 export function savedRunPath(run: SavedRun, root: string = STORE_DIR): string {
-  const patternName = run.patternScore.pattern;
+  const patternName = run.patternScore?.pattern ?? run.executableScore.pattern;
   const fp = safeFingerprintSlice(run.problemFingerprint);
   const ts = safeTimestampSlug(run.timestamp);
   return path.join(root, patternName, `${fp}-${ts}.json`);
